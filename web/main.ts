@@ -677,7 +677,8 @@ class GitGraphView {
 			commitOrdering: getCommitOrdering(repoState.commitOrdering),
 			remotes: this.gitRemotes,
 			hideRemotes: repoState.hideRemotes,
-			stashes: this.gitStashes
+			stashes: this.gitStashes,
+			pathFilter: null
 		});
 	}
 
@@ -2081,7 +2082,7 @@ class GitGraphView {
 			{ type: DialogInputType.Checkbox, name: getText('ui.ignoreDate'), value: this.config.dialogDefaults.rebase.ignoreDate, info: getText('ui.ignoreDateInfo') }
 		], getText('ui.yesRebase'), (values) => {
 			let interactive = <boolean>values[0];
-			runAction({ command: 'rebase', repo: this.currentRepo, obj: obj, actionOn: actionOn, ignoreDate: <boolean>values[1], interactive: interactive }, interactive ? getText('ui.actionLaunchingInteractiveRebase') : getText('ui.rebasingOn', getText(actionOn === GG.RebaseActionOn.Branch ? 'ui.rebaseSubjectBranch' : 'ui.rebaseSubjectCommit') + ' <b><i>' + escapeHtml(name) + '</i></b>'));
+			runAction({ command: 'rebase', repo: this.currentRepo, obj: obj, actionOn: actionOn, ignoreDate: <boolean>values[1], interactive: interactive, signoff: false }, interactive ? getText('ui.actionLaunchingInteractiveRebase') : getText('ui.rebasingOn', getText(actionOn === GG.RebaseActionOn.Branch ? 'ui.rebaseSubjectBranch' : 'ui.rebaseSubjectCommit') + ' <b><i>' + escapeHtml(name) + '</i></b>'));
 		}, target);
 	}
 

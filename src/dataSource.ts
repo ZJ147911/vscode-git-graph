@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import { AskpassEnvironment, AskpassManager } from './askpass/askpassManager';
 import { getConfig } from './config';
 import { Logger } from './logger';
-import { ActionedUser, CommitOrdering, DateType, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitPushBranchMode, GitRepoConfig, GitRepoConfigBranches, GitResetMode, GitSignature, GitSignatureStatus, GitStash, GitTagDetails, MergeActionOn, RebaseActionOn, SquashMessageFormat, TagType, Writeable } from './types';
+import { ActionedUser, CommitOrdering, DateType, DeepWriteable, ErrorInfo, ErrorInfoExtensionPrefix, GitCommit, GitCommitDetails, GitCommitStash, GitConfigLocation, GitFileChange, GitFileStatus, GitPushBranchMode, GitRepoConfig, GitRepoConfigBranches, GitResetMode, GitSignature, GitSignatureStatus, GitStash, GitTagDetails, MergeActionOn, PATH_FILTER_WS_ALL, RebaseActionOn, RebaseTodoEntry, SquashMessageFormat, TagType, Writeable } from './types';
 import { GitExecutable, GitVersionRequirement, UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, abbrevCommit, constructIncompatibleGitVersionMessage, doesVersionMeetRequirement, getPathFromStr, getPathFromUri, openGitTerminal, pathWithTrailingSlash, realpath, resolveSpawnOutput, showErrorMessage } from './utils';
 import { Disposable } from './utils/disposable';
 import { Event } from './utils/event';
@@ -161,7 +161,7 @@ export class DataSource extends Disposable {
 	 * @param stashes An array of all stashes in the repository.
 	 * @returns The commits in the repository.
 	 */
-	public getCommits(repo: string, branches: ReadonlyArray<string> | null, authors: ReadonlyArray<string> | null, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>, simplifyByDecoration: boolean): Promise<GitCommitData> {
+	public getCommits(repo: string, branches: ReadonlyArray<string> | null, authors: ReadonlyArray<string> | null, maxCommits: number, showTags: boolean, showRemoteBranches: boolean, includeCommitsMentionedByReflogs: boolean, onlyFollowFirstParent: boolean, commitOrdering: CommitOrdering, remotes: ReadonlyArray<string>, hideRemotes: ReadonlyArray<string>, stashes: ReadonlyArray<GitStash>, simplifyByDecoration: boolean, pathFilter: string | null): Promise<GitCommitData> {
 		const config = getConfig();
 		return Promise.all([
 			this.getLog(repo, branches, authors, maxCommits + 1, showTags && config.showCommitsOnlyReferencedByTags, showRemoteBranches, includeCommitsMentionedByReflogs, onlyFollowFirstParent, commitOrdering, remotes, hideRemotes, stashes, simplifyByDecoration),
@@ -200,7 +200,7 @@ export class DataSource extends Disposable {
 
 			for (i = 0; i < commits.length; i++) {
 				commitLookup[commits[i].hash] = i;
-				commitNodes.push({ ...commits[i], heads: [], tags: [], remotes: [], stash: null });
+				commitNodes.push({ ...commits[i], heads: [], tags: [], remotes: [], stash: null, isSyntheticParent: false, isPathFilterMatch: true });
 			}
 
 			/* Insert Stashes */
@@ -231,7 +231,9 @@ export class DataSource extends Disposable {
 						selector: stash.selector,
 						baseHash: stash.baseHash,
 						untrackedFilesHash: stash.untrackedFilesHash
-					}
+					},
+					isSyntheticParent: false,
+					isPathFilterMatch: true
 				});
 			}
 			for (i = 0; i < commitNodes.length; i++) {
@@ -260,15 +262,34 @@ export class DataSource extends Disposable {
 				}
 			}
 
+			const pathFilterActive = pathFilter !== null && pathFilter !== PATH_FILTER_WS_ALL;
+			if (pathFilterActive || pathFilter === PATH_FILTER_WS_ALL) {
+				const paths = pathFilter === PATH_FILTER_WS_ALL ? [] : pathFilter.split(',').map((p) => p.trim()).filter((p) => p !== '');
+				for (i = commitNodes.length - 1; i >= 0; i--) {
+					const matches = await this.commitMatchesPathFilter(repo, commitNodes[i].hash, paths);
+					commitNodes[i].isPathFilterMatch = matches;
+					if (!matches && commitNodes[i].parents.length > 0) {
+						for (let k = 0; k < commitNodes[i].parents.length; k++) {
+							const parentIndex = commitLookup[commitNodes[i].parents[k]];
+							if (typeof parentIndex === 'number' && !commitNodes[parentIndex].isPathFilterMatch) {
+								commitNodes[i].isSyntheticParent = true;
+								break;
+							}
+						}
+					}
+				}
+			}
+
 			return {
 				commits: commitNodes,
 				head: refData.head,
 				tags: unique(refData.tags.map((tag) => tag.name)),
 				moreCommitsAvailable: moreCommitsAvailable,
-				error: null
+				error: null,
+				pathFilterActive: pathFilterActive
 			};
 		}).catch((errorMessage) => {
-			return { commits: [], head: null, tags: [], moreCommitsAvailable: false, error: errorMessage };
+			return { commits: [], head: null, tags: [], moreCommitsAvailable: false, error: errorMessage, pathFilterActive: false };
 		});
 	}
 
@@ -1069,7 +1090,7 @@ export class DataSource extends Disposable {
 	 * @param interactive Should the rebase be performed interactively.
 	 * @returns The ErrorInfo from the executed command.
 	 */
-	public rebase(repo: string, obj: string, actionOn: RebaseActionOn, ignoreDate: boolean, interactive: boolean) {
+	public rebase(repo: string, obj: string, actionOn: RebaseActionOn, ignoreDate: boolean, interactive: boolean, signoff: boolean) {
 		if (interactive) {
 			return this.openGitTerminal(
 				repo,
@@ -1083,11 +1104,109 @@ export class DataSource extends Disposable {
 			if (ignoreDate) {
 				args.push('--ignore-date');
 			}
+			if (signoff) {
+				args.push('--signoff');
+			}
 			if (getConfig().signCommits) {
 				args.push('-S');
 			}
 			return this.runGitCommand(args, repo);
 		}
+	}
+
+	/**
+	 * Check whether a commit matches the path filter.
+	 * @param repo The path of the repository.
+	 * @param commitHash The hash of the commit.
+	 * @param paths The paths to filter by.
+	 * @returns TRUE => The commit matches the path filter, FALSE => It doesn't.
+	 */
+	private commitMatchesPathFilter(repo: string, commitHash: string, paths: string[]) {
+		const args = ['diff-tree', '--no-commit-id', '--name-only', '-r', commitHash, '--'];
+		if (paths.length > 0) args.push(...paths);
+		return this.spawnGit(args, repo, (stdout) => {
+			return stdout.trim() !== '';
+		}).then((result) => result, () => true);
+	}
+
+	/**
+	 * Get the list of rebase todo items for interactive rebase.
+	 * @param repo The path of the repository.
+	 * @param obj The object the current branch will be rebased onto.
+	 * @param actionOn Is the rebase on a branch or commit.
+	 * @returns The rebase todo list, or an error message.
+	 */
+	public getRebaseTodoList(repo: string, obj: string, actionOn: RebaseActionOn): Promise<{ items: { hash: string, subject: string }[] | null, error: ErrorInfo }> {
+		const target = actionOn === RebaseActionOn.Branch ? obj : obj + '^..HEAD';
+		return this.spawnGit(['-c', 'log.showSignature=false', 'log', '--format=%H%x00%s', target, '--'], repo, (stdout) => {
+			const items: { hash: string, subject: string }[] = [];
+			const lines = stdout.split(EOL_REGEX);
+			for (let i = 0; i < lines.length - 1; i++) {
+				const parts = lines[i].split('\0');
+				if (parts.length === 2) {
+					items.push({ hash: parts[0], subject: parts[1] });
+				}
+			}
+			return items.reverse();
+		}).then((items) => ({ items: items, error: null }), (error) => ({ items: null, error: error }));
+	}
+
+	/**
+	 * Perform an interactive rebase with the provided todo entries.
+	 * @param repo The path of the repository.
+	 * @param obj The object the current branch will be rebased onto.
+	 * @param actionOn Is the rebase on a branch or commit.
+	 * @param entries The rebase todo entries.
+	 * @param signoff Is `--signoff` enabled.
+	 * @returns The ErrorInfo from the executed command.
+	 */
+	public rebaseInteractive(repo: string, obj: string, actionOn: RebaseActionOn, entries: ReadonlyArray<RebaseTodoEntry>, signoff: boolean) {
+		const args = ['rebase', '--interactive'];
+		if (signoff) {
+			args.push('--signoff');
+		}
+		if (getConfig().signCommits) {
+			args.push('-S');
+		}
+		if (actionOn === RebaseActionOn.Branch) {
+			args.push(obj);
+		} else {
+			args.push('-i', obj + '^..HEAD');
+		}
+		const env: { [key: string]: string } = {};
+		const sequence = entries.map((entry) => entry.action + ' ' + entry.hash).join('\n');
+		const sequenceEditor = this.getGitEditorScript(sequence);
+		if (process.platform === 'win32') {
+			env.GIT_SEQUENCE_EDITOR = 'powershell -Command "' + sequenceEditor.replace(/"/g, '\"') + '"';
+		} else {
+			env.GIT_SEQUENCE_EDITOR = 'sh -c "' + sequenceEditor.replace(/"/g, '\"') + '"';
+		}
+		return this.runGitCommandWithEnv(args, repo, env);
+	}
+
+	private getGitEditorScript(sequence: string) {
+		return 'printf "%s\\n" "' + sequence.replace(/"/g, '\\"').replace(/\n/g, '\\n') + '" > "$1"';
+	}
+
+	private runGitCommandWithEnv(args: string[], repo: string, env: { [key: string]: string }) {
+		const envVars = Object.assign({}, process.env, env);
+		return new Promise<ErrorInfo>((resolve) => {
+			if (this.gitExecutable === null) {
+				return resolve(UNABLE_TO_FIND_GIT_MSG);
+			}
+
+			const child = cp.spawn(this.gitExecutable.path, args, {
+				cwd: repo,
+				env: envVars
+			});
+			let stdout = '', stderr = '';
+			child.stdout!.on('data', (buffer: Buffer) => stdout += buffer.toString());
+			child.stderr!.on('data', (buffer: Buffer) => stderr += buffer.toString());
+			child.on('error', (error: Error) => resolve(error.toString()));
+			child.on('exit', (code: number | null) => {
+				resolve(code === 0 ? null : (stderr !== '' ? stderr : stdout).trim());
+			});
+		});
 	}
 
 
@@ -2182,6 +2301,7 @@ interface GitCommitData {
 	tags: string[];
 	moreCommitsAvailable: boolean;
 	error: ErrorInfo;
+	pathFilterActive: boolean;
 }
 
 export interface GitCommitDetailsData {

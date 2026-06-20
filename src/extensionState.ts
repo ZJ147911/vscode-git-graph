@@ -38,7 +38,8 @@ export const DEFAULT_REPO_STATE: GitRepoState = {
 	showStashes: BooleanOverride.Default,
 	showTags: BooleanOverride.Default,
 	workspaceFolderIndex: null,
-	isCdvSummaryHidden: false
+	isCdvSummaryHidden: false,
+	pathFilter: null
 };
 
 const DEFAULT_GIT_GRAPH_VIEW_GLOBAL_STATE: GitGraphViewGlobalState = {

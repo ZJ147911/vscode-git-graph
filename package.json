@@ -103,6 +103,11 @@
 			},
 			{
 				"category": "Git Graph",
+				"command": "git-graph.openWithPathFilter",
+				"title": "%command.filterInGitGraph%"
+			},
+			{
+				"category": "Git Graph",
 				"command": "git-graph.viewInEditor",
 				"title": "%command.viewInEditor%"
 			},
@@ -1600,6 +1605,16 @@
 				{
 					"command": "git-graph.openFile",
 					"when": "isInDiffEditor && resourceScheme == git-graph && git-graph:codiconsSupported"
+				},
+				{
+					"command": "git-graph.openWithPathFilter",
+					"when": "false"
+				}
+			],
+			"explorer/context": [
+				{
+					"command": "git-graph.openWithPathFilter",
+					"group": "4_search"
 				}
 			],
 			"editor/title": [

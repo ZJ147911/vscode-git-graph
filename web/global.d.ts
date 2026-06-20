@@ -67,6 +67,7 @@ declare global {
 		readonly selectedCommits: string[];
 		readonly findWidget: FindWidgetState;
 		readonly settingsWidget: SettingsWidgetState;
+		readonly workspaceFolderPaths?: { readonly [repo: string]: readonly string[] };
 	}
 
 

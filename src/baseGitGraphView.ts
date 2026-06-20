@@ -8,7 +8,7 @@ import { Logger } from './logger';
 import { RepoFileWatcher } from './repoFileWatcher';
 import { RepoManager } from './repoManager';
 import { ErrorInfo, GitConfigLocation, GitGraphViewInitialState, GitPushBranchMode, GitRepoSet, I18nTexts, LoadGitGraphViewTo, RequestDropCommits, RequestMessage, RequestSquashCommits, ResponseMessage } from './types';
-import { UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, createPullRequest, getNonce, openExtensionSettings, openExternalUrl, openFile, showErrorMessage, viewDiff, viewDiffWithWorkingFile, viewFileAtRevision, viewScm } from './utils';
+import { UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, createPullRequest, getNonce, getPathFromUri, openExtensionSettings, openExternalUrl, openFile, showErrorMessage, viewDiff, viewDiffWithWorkingFile, viewFileAtRevision, viewScm } from './utils';
 import { createWebviewNlsTranslator } from './utils/nlsWebview';
 import { mergeAllWebviewNls } from './utils/webviewExtraNls';
 import { Disposable, toDisposable } from './utils/disposable';
@@ -405,7 +405,7 @@ export abstract class BaseGitGraphView extends Disposable {
 					command: 'loadCommits',
 					refreshId: msg.refreshId,
 					onlyFollowFirstParent: msg.onlyFollowFirstParent,
-					...await this.dataSource.getCommits(msg.repo, msg.branches, msg.authors, msg.maxCommits, msg.showTags, msg.showRemoteBranches, msg.includeCommitsMentionedByReflogs, msg.onlyFollowFirstParent, msg.commitOrdering, msg.remotes, msg.hideRemotes, msg.stashes, msg.simplifyByDecoration)
+					...await this.dataSource.getCommits(msg.repo, msg.branches, msg.authors, msg.maxCommits, msg.showTags, msg.showRemoteBranches, msg.includeCommitsMentionedByReflogs, msg.onlyFollowFirstParent, msg.commitOrdering, msg.remotes, msg.hideRemotes, msg.stashes, msg.simplifyByDecoration, msg.pathFilter)
 				});
 				break;
 			case 'loadConfig':
@@ -524,7 +524,23 @@ export abstract class BaseGitGraphView extends Disposable {
 					command: 'rebase',
 					actionOn: msg.actionOn,
 					interactive: msg.interactive,
-					error: await this.dataSource.rebase(msg.repo, msg.obj, msg.actionOn, msg.ignoreDate, msg.interactive)
+					error: await this.dataSource.rebase(msg.repo, msg.obj, msg.actionOn, msg.ignoreDate, msg.interactive, msg.signoff)
+				});
+				break;
+			case 'getRebaseTodoList':
+				{
+					const result = await this.dataSource.getRebaseTodoList(msg.repo, msg.obj, msg.actionOn);
+					this.sendMessage({
+						command: 'getRebaseTodoList',
+						items: result.items,
+						error: result.error
+					});
+				}
+				break;
+			case 'rebaseInteractive':
+				this.sendMessage({
+					command: 'rebaseInteractive',
+					error: await this.dataSource.rebaseInteractive(msg.repo, msg.obj, msg.actionOn, msg.entries, msg.signoff)
 				});
 				break;
 			case 'renameBranch':
@@ -678,6 +694,7 @@ export abstract class BaseGitGraphView extends Disposable {
 		const i18n: I18nTexts = {
 			...mergeAllWebviewNls(wt)
 		};
+		const repos = this.repoManager.getRepos();
 		const initialState: GitGraphViewInitialState = {
 			config: {
 				commitDetailsView: config.commitDetailsView,
@@ -720,7 +737,8 @@ export abstract class BaseGitGraphView extends Disposable {
 			loadViewTo: this.loadViewTo,
 			repos: this.repoManager.getRepos(),
 			loadRepoInfoRefreshId: this.loadRepoInfoRefreshId,
-			loadCommitsRefreshId: this.loadCommitsRefreshId
+			loadCommitsRefreshId: this.loadCommitsRefreshId,
+			workspaceFolderPaths: this.getWorkspaceFolderPaths(repos)
 		};
 		const globalState = this.extensionState.getGlobalViewState();
 		const workspaceState = this.extensionState.getWorkspaceViewState();
@@ -746,6 +764,7 @@ export abstract class BaseGitGraphView extends Disposable {
 				<div id="controls"${stickyClassAttr}>
 					<span id="repoControl"><span class="unselectable">${wt('ui.repo')}: </span><div id="repoDropdown" class="dropdown"></div></span>
 					<span id="branchControl"><span class="unselectable">${wt('ui.branches')}: </span><div id="branchDropdown" class="dropdown"></div></span>
+					<span id="pathFilterControl" title="${wt('ui.selectPathByContextMenu')}"><span class="unselectable">${wt('ui.paths')}: </span><div id="pathFilterDropdown" class="dropdown"></div></span>
 					<span id="authorControl"><span class="unselectable">${wt('ui.authors')}: </span><div id="authorDropdown" class="dropdown"></div></span>
 					<label ${hideRemotes} id="showRemoteBranchesControl" title="${wt('ui.showRemoteBranches')}"><input type="checkbox" id="showRemoteBranchesCheckbox" tabindex="-1"><span class="customCheckbox"></span>${wt('ui.remotes')}</label>
 					<label ${hideSimplify} id="simplifyByDecorationControl" title="${wt('ui.simplifyByDecoration')}"><input type="checkbox" id="simplifyByDecorationCheckbox" tabindex="-1"><span class="customCheckbox"></span>${wt('ui.simplify')}</label>
@@ -828,8 +847,28 @@ export abstract class BaseGitGraphView extends Disposable {
 			command: 'loadRepos',
 			repos: repos,
 			lastActiveRepo: this.extensionState.getLastActiveRepo(),
-			loadViewTo: loadViewTo
+			loadViewTo: loadViewTo,
+			workspaceFolderPaths: this.getWorkspaceFolderPaths(repos)
 		});
+	}
+
+	/**
+	 * Get the workspace folder paths for each repository.
+	 * @param repos The set of repositories.
+	 * @returns A mapping from repository path to workspace folder paths.
+	 */
+	private getWorkspaceFolderPaths(repos: GitRepoSet): { [repo: string]: string[] } {
+		const workspaceFolderPaths: { [repo: string]: string[] } = {};
+		const workspaceFolders = vscode.workspace.workspaceFolders || [];
+		for (const repoPath of Object.keys(repos)) {
+			const index = repos[repoPath].workspaceFolderIndex;
+			if (index !== null && workspaceFolders[index]) {
+				workspaceFolderPaths[repoPath] = [getPathFromUri(workspaceFolders[index].uri)];
+			} else {
+				workspaceFolderPaths[repoPath] = [];
+			}
+		}
+		return workspaceFolderPaths;
 	}
 }
 

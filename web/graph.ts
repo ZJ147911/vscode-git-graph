@@ -346,6 +346,7 @@ class Graph {
 	private commitHead: string | null = null;
 	private commitLookup: { [hash: string]: number } = {};
 	private onlyFollowFirstParent: boolean = false;
+	private pathFilterActive: boolean = false;
 	private expandedCommitIndex: number = -1;
 
 	private readonly viewElem: HTMLElement;
@@ -390,11 +391,12 @@ class Graph {
 
 	/* Graph Operations */
 
-	public loadCommits(commits: ReadonlyArray<GG.GitCommit>, commitHead: string | null, commitLookup: { [hash: string]: number }, onlyFollowFirstParent: boolean) {
+	public loadCommits(commits: ReadonlyArray<GG.GitCommit>, commitHead: string | null, commitLookup: { [hash: string]: number }, onlyFollowFirstParent: boolean, pathFilterActive: boolean = false) {
 		this.commits = commits;
 		this.commitHead = commitHead;
 		this.commitLookup = commitLookup;
 		this.onlyFollowFirstParent = onlyFollowFirstParent;
+		this.pathFilterActive = pathFilterActive;
 		this.vertices = [];
 		this.branches = [];
 		this.availableColours = [];
@@ -587,6 +589,14 @@ class Graph {
 		}
 
 		return muted;
+	}
+
+	public getPathFilterDimmedCommits() {
+		const dimmed = [];
+		for (let i = 0; i < this.commits.length; i++) {
+			dimmed[i] = this.pathFilterActive && !this.commits[i].isPathFilterMatch && !this.commits[i].isSyntheticParent;
+		}
+		return dimmed;
 	}
 
 
