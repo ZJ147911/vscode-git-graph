@@ -13,6 +13,8 @@ class GitGraphView {
 	private avatars: AvatarImageCollection = {};
 	private currentBranches: string[] | null = null;
 	private currentAuthors: string[] | null = null;
+	private currentPathFilter: string | null = null;
+	private workspaceFolderPaths: { readonly [repo: string]: readonly string[] } = {};
 
 	private currentRepo!: string;
 	private currentRepoLoading: boolean = true;
@@ -48,6 +50,7 @@ class GitGraphView {
 	private readonly repoDropdown: Dropdown;
 	private readonly branchDropdown: Dropdown;
 	private readonly authorDropdown: Dropdown;
+	private readonly pathFilterDropdown: Dropdown;
 
 	private readonly viewElem: HTMLElement;
 	private readonly controlsElem: HTMLElement;
@@ -102,6 +105,14 @@ class GitGraphView {
 			this.clearCommits();
 			this.requestLoadRepoInfoAndCommits(true, true);
 		}, this.config.singleAuthorSelect);
+		this.pathFilterDropdown = new Dropdown('pathFilterDropdown', true, false, getText('ui.paths'), (values) => {
+			this.currentPathFilter = values[0] || null;
+			this.maxCommits = this.config.initialLoadCommits;
+			this.saveRepoStateValue(this.currentRepo, 'pathFilter', this.currentPathFilter);
+			this.saveState();
+			this.clearCommits();
+			this.requestLoadRepoInfoAndCommits(true, true);
+		});
 		this.showRemoteBranchesElem = <HTMLInputElement>document.getElementById('showRemoteBranchesCheckbox')!;
 		this.showRemoteBranchesElem.addEventListener('change', () => {
 			this.saveRepoStateValue(this.currentRepo, 'showRemoteBranchesV2', this.showRemoteBranchesElem.checked ? GG.BooleanOverride.Enabled : GG.BooleanOverride.Disabled);
@@ -191,6 +202,20 @@ class GitGraphView {
 
 	/* Loading Data */
 
+	public setWorkspaceFolderPaths(workspaceFolderPaths: { readonly [repo: string]: readonly string[] }) {
+		this.workspaceFolderPaths = workspaceFolderPaths;
+	}
+
+	private renderPathFilterOptions() {
+		const PATH_FILTER_WS_ALL = 'workspace_all';
+		const options: { name: string, value: string }[] = [{ name: getText('ui.all'), value: '' }];
+		const paths = this.workspaceFolderPaths[this.currentRepo];
+		if (paths && paths.length > 0) {
+			options.push({ name: getText('ui.workspace'), value: PATH_FILTER_WS_ALL });
+		}
+		this.pathFilterDropdown.setOptions(options, [this.currentPathFilter || '']);
+	}
+
 	public loadRepos(repos: GG.GitRepoSet, lastActiveRepo: string | null, loadViewTo: GG.LoadGitGraphViewTo) {
 		this.gitRepos = repos;
 		this.saveState();
@@ -234,6 +259,7 @@ class GitGraphView {
 		this.currentRepoLoading = true;
 		this.showRemoteBranchesElem.checked = getShowRemoteBranches(this.gitRepos[this.currentRepo].showRemoteBranchesV2);
 		this.simplifyByDecorationElem.checked = getSimplifyByDecoration(this.gitRepos[this.currentRepo].simplifyByDecoration);
+		this.currentPathFilter = this.gitRepos[this.currentRepo].pathFilter;
 		this.maxCommits = this.config.initialLoadCommits;
 		this.gitConfig = null;
 		this.gitRemotes = [];
@@ -305,6 +331,7 @@ class GitGraphView {
 		// Set up branch dropdown options
 		this.branchDropdown.setOptions(this.getBranchOptions(true), this.currentBranches);
 		this.authorDropdown.setOptions(this.getAuthorOptions(), this.currentAuthors);
+		this.renderPathFilterOptions();
 
 		// Remove hidden remotes that no longer exist
 		let hiddenRemotes = this.gitRepos[this.currentRepo].hideRemotes;
@@ -678,7 +705,7 @@ class GitGraphView {
 			remotes: this.gitRemotes,
 			hideRemotes: repoState.hideRemotes,
 			stashes: this.gitStashes,
-			pathFilter: null
+			pathFilter: this.currentPathFilter
 		});
 	}
 
@@ -3876,6 +3903,7 @@ window.addEventListener('load', () => {
 				gitGraph.processLoadRepoInfoResponse(msg);
 				break;
 			case 'loadRepos':
+				gitGraph.setWorkspaceFolderPaths(msg.workspaceFolderPaths);
 				gitGraph.loadRepos(msg.repos, msg.lastActiveRepo, msg.loadViewTo);
 				break;
 			case 'merge':
