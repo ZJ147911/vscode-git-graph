@@ -81,6 +81,7 @@ type DialogTarget = {
 	ref?: string;
 } | RepoTarget;
 
+
 /**
  * Implements the Git Graph View's dialogs.
  */
@@ -90,6 +91,7 @@ class Dialog {
 	private actioned: (() => void) | null = null;
 	private type: DialogType | null = null;
 	private customSelects: { [inputIndex: string]: CustomSelect } = {};
+	private customOnClose: (() => void) | null = null;
 
 	private static readonly WHITESPACE_REGEXP = /\s/gu;
 
@@ -101,7 +103,7 @@ class Dialog {
 	 * @param target The target that the dialog was triggered on.
 	 */
 	public showConfirmation(message: string, actionName: string, actioned: () => void, target: DialogTarget | null) {
-		this.show(DialogType.Form, message, actionName, 'Cancel', () => {
+		this.show(DialogType.Form, message, actionName, getText('ui.cancel'), () => {
 			this.close();
 			actioned();
 		}, null, target);
@@ -170,6 +172,7 @@ class Dialog {
 		], actionName, (values) => actioned(<string>values[0]), target);
 	}
 
+
 	/**
 	 * Show a dialog to the user with a single multi-select input.
 	 * @param message A message outlining the purpose of the dialog.
@@ -185,6 +188,7 @@ class Dialog {
 		], actionName, (values) => actioned(<string[]>values[0]), target);
 	}
 
+
 	/**
 	 * Show a dialog to the user which can include any number of form inputs.
 	 * @param message A message outlining the purpose of the dialog.
@@ -196,7 +200,7 @@ class Dialog {
 	 * @param secondaryActioned An optional callback to be invoked when the secondary action is selected by the user.
 	 * @param includeLineBreak Should a line break be added between the message and form inputs.
 	 */
-	public showForm(message: string, inputs: ReadonlyArray<DialogInput>, actionName: string, actioned: (values: DialogInputValue[]) => void, target: DialogTarget | null, secondaryActionName: string = 'Cancel', secondaryActioned: ((values: DialogInputValue[]) => void) | null = null, includeLineBreak: boolean = true) {
+	public showForm(message: string, inputs: ReadonlyArray<DialogInput>, actionName: string, actioned: (values: DialogInputValue[]) => void, target: DialogTarget | null, secondaryActionName: string = getText('ui.cancel'), secondaryActioned: ((values: DialogInputValue[]) => void) | null = null, includeLineBreak: boolean = true) {
 		const multiElement = inputs.length > 1;
 		const multiCheckbox = multiElement && inputs.every((input) => input.type === DialogInputType.Checkbox);
 		const infoColRequired = inputs.some((input) => input.type !== DialogInputType.Checkbox && input.type !== DialogInputType.Radio && input.info);
@@ -280,7 +284,9 @@ class Dialog {
 				const noInput = dialogInput.value === '', invalidInput = dialogInput.value.match(REF_INVALID_REGEX) !== null;
 				alterClass(this.elem, CLASS_DIALOG_NO_INPUT, noInput);
 				if (alterClass(this.elem, CLASS_DIALOG_INPUT_INVALID, !noInput && invalidInput)) {
-					dialogAction.title = invalidInput ? 'Unable to ' + actionName + ', one or more invalid characters entered.' : '';
+					dialogAction.title = invalidInput
+						? getText('ui.cannot') + actionName + getText('ui.invalidCharactersEntered')
+						: '';
 				}
 			});
 		}
@@ -296,7 +302,7 @@ class Dialog {
 	 * @param html The HTML to display in the dialog.
 	 */
 	public showMessage(html: string) {
-		this.show(DialogType.Message, html, null, 'Close', null, null, null);
+		this.show(DialogType.Message, html, null, getText('ui.close'), null, null, null);
 	}
 
 	/**
@@ -307,7 +313,7 @@ class Dialog {
 	 * @param actioned An optional callback to be invoked when the primary action is triggered.
 	 */
 	public showError(message: string, reason: GG.ErrorInfo, actionName: string | null, actioned: (() => void) | null) {
-		this.show(DialogType.Message, '<span class="dialogAlert">' + SVG_ICONS.alert + 'Error: ' + message + '</span>' + (reason !== null ? '<br><span class="messageContent errorContent">' + escapeHtml(reason).split('\n').join('<br>') + '</span>' : ''), actionName, 'Dismiss', () => {
+		this.show(DialogType.Message, '<span class="dialogAlert">' +	SVG_ICONS.alert + getText('ui.error') + ': ' +	message +	'</span>' +	(reason !== null		? '<br><span class="messageContent errorContent">' + escapeHtml(reason).split('\n').join('<br>') + '</span>' : ''), actionName, getText('ui.close'), () => {
 			this.close();
 			if (actioned !== null) actioned();
 		}, null, null);
@@ -318,7 +324,21 @@ class Dialog {
 	 * @param action A short name that identifies the action that is running.
 	 */
 	public showActionRunning(action: string) {
-		this.show(DialogType.ActionRunning, '<span class="actionRunning">' + SVG_ICONS.loading + action + ' ...</span>', null, 'Dismiss', null, null, null);
+		this.show(DialogType.ActionRunning, '<span class="actionRunning">' + SVG_ICONS.loading + action + getText('ui.dialogEllipsisRunning') + '</span>', null, getText('ui.close'), null, null, null);
+	}
+
+	/**
+	 * Show a custom dialog to the user.
+	 * @param html The HTML content for the dialog.
+	 * @param actionName The name of the primary (default) action.
+	 * @param actioned A callback to be invoked when the primary (default) action is selected by the user.
+	 * @param secondaryActionName The name of the secondary action.
+	 * @param secondaryActioned A callback to be invoked when the secondary action is selected by the user.
+	 * @param onClose A callback to be invoked when the dialog is closed.
+	 */
+	public showCustom(html: string, actionName: string, actioned: () => void, secondaryActionName: string, secondaryActioned: () => void, onClose: (() => void) | null) {
+		this.show(DialogType.Message, html, actionName, secondaryActionName, actioned, secondaryActioned, null);
+		this.customOnClose = onClose;
 	}
 
 	/**
@@ -357,7 +377,6 @@ class Dialog {
 			this.actioned = actioned;
 		}
 		document.getElementById('dialogSecondaryAction')!.addEventListener('click', secondaryActioned !== null ? secondaryActioned : () => this.close());
-
 		if (this.target !== null && this.target.type !== TargetType.Repo) {
 			alterClass(this.target.elem, CLASS_DIALOG_ACTIVE, true);
 		}
@@ -378,6 +397,10 @@ class Dialog {
 		this.customSelects = {};
 		this.actioned = null;
 		this.type = null;
+		if (this.customOnClose !== null) {
+			this.customOnClose();
+			this.customOnClose = null;
+		}
 	}
 
 	/**
@@ -696,7 +719,7 @@ class CustomSelect {
 	 */
 	private renderCurrentValue() {
 		if (this.currentElem === null) return;
-		const value = formatCommaSeparatedList(this.data.options.filter((_, index) => this.selected[index]).map((option) => option.name)) || 'None';
+		const value = formatCommaSeparatedList(this.data.options.filter((_, index) => this.selected[index]).map((option) => option.name)) || getText('ui.none');
 		this.currentElem.title = value;
 		this.currentElem.innerHTML = escapeHtml(value);
 	}

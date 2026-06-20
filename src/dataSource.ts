@@ -376,7 +376,7 @@ export class DataSource extends Disposable {
 					return {};
 				}
 			} else {
-				errorMessage = 'An unexpected error occurred while spawning the Git child process.';
+				errorMessage = vscode.l10n.t('ui.errorStartingGitProcess');
 			}
 			throw errorMessage;
 		}) as Promise<ActionedUser[]>;
@@ -490,12 +490,11 @@ export class DataSource extends Disposable {
 	 * @returns The file contents.
 	 */
 	public getCommitFile(repo: string, commitHash: string, filePath: string) {
-		return this._spawnGit(['show', commitHash + ':' + filePath], repo, stdout => {
+		return this._spawnGit(['show', commitHash + ':' + filePath], repo, (stdout) => {
 			const encoding = getConfig(repo).fileEncoding;
 			return decode(stdout, encodingExists(encoding) ? encoding : 'utf8');
 		});
 	}
-
 
 	/* Get Data Methods - General */
 
@@ -522,7 +521,6 @@ export class DataSource extends Disposable {
 			return stdout.split(EOL_REGEX)[0];
 		}).then((url) => url, () => null);
 	}
-
 	/**
 	 * Check to see if a file has been renamed between a commit and the working tree, and return the new file path.
 	 * @param repo The path of the repository.
@@ -737,7 +735,6 @@ export class DataSource extends Disposable {
 		return this.runGitCommand(['remote', 'prune', name], repo);
 	}
 
-
 	/* Git Action Methods - Tags */
 
 	/**
@@ -779,7 +776,6 @@ export class DataSource extends Disposable {
 		return this.runGitCommand(['tag', '-d', tagName], repo);
 	}
 
-
 	/* Git Action Methods - Remote Sync */
 
 	/**
@@ -800,7 +796,7 @@ export class DataSource extends Disposable {
 			if (!prune) {
 				return Promise.resolve('In order to Prune Tags, pruning must also be enabled when fetching from ' + (remote !== null ? 'a remote' : 'remote(s)') + '.');
 			} else if (this.gitExecutable !== null && !doesVersionMeetRequirement(this.gitExecutable.version, GitVersionRequirement.FetchAndPruneTags)) {
-				return Promise.resolve(constructIncompatibleGitVersionMessage(this.gitExecutable, GitVersionRequirement.FetchAndPruneTags, 'pruning tags when fetching'));
+				return Promise.resolve(constructIncompatibleGitVersionMessage(this.gitExecutable, GitVersionRequirement.FetchAndPruneTags, vscode.l10n.t('ui.pruneTagsWhenFetching')));
 			}
 			args.push('--prune-tags');
 		}
@@ -840,7 +836,7 @@ export class DataSource extends Disposable {
 	 */
 	public async pushBranchToMultipleRemotes(repo: string, branchName: string, remotes: string[], setUpstream: boolean, mode: GitPushBranchMode, noVerify: boolean): Promise<ErrorInfo[]> {
 		if (remotes.length === 0) {
-			return ['No remote(s) were specified to push the branch ' + branchName + ' to.'];
+			return [vscode.l10n.t('ui.noRemoteToPushBranch', { branch: branchName })];
 		}
 
 		const results: ErrorInfo[] = [];
@@ -863,7 +859,7 @@ export class DataSource extends Disposable {
 	 */
 	public async pushTag(repo: string, tagName: string, remotes: string[], commitHash: string, skipRemoteCheck: boolean): Promise<ErrorInfo[]> {
 		if (remotes.length === 0) {
-			return ['No remote(s) were specified to push the tag ' + tagName + ' to.'];
+			return [vscode.l10n.t('ui.noRemoteToPushTag', { tag: tagName })];
 		}
 
 		if (!skipRemoteCheck) {
@@ -882,7 +878,6 @@ export class DataSource extends Disposable {
 		}
 		return results;
 	}
-
 
 	/* Git Action Methods - Branches */
 
@@ -949,9 +944,9 @@ export class DataSource extends Disposable {
 	 */
 	public async deleteRemoteBranch(repo: string, branchName: string, remote: string) {
 		let remoteStatus = await this.runGitCommand(['push', remote, '--delete', branchName], repo);
-		if (remoteStatus !== null && (new RegExp('remote ref does not exist', 'i')).test(remoteStatus)) {
+		if (remoteStatus !== null && new RegExp('remote ref does not exist', 'i').test(remoteStatus)) {
 			let trackingBranchStatus = await this.runGitCommand(['branch', '-d', '-r', remote + '/' + branchName], repo);
-			return trackingBranchStatus === null ? null : 'Branch does not exist on the remote, deleting the remote tracking branch ' + remote + '/' + branchName + '.\n' + trackingBranchStatus;
+			return trackingBranchStatus === null ? null : vscode.l10n.t('ui.branchNotOnRemote', { remote, branch: branchName }) + '\n' + trackingBranchStatus;
 		}
 		return remoteStatus;
 	}
@@ -1028,7 +1023,6 @@ export class DataSource extends Disposable {
 		return this.runGitCommand(['branch', '-m', oldName, newName], repo);
 	}
 
-
 	/* Git Action Methods - Branches & Commits */
 
 	/**
@@ -1080,7 +1074,9 @@ export class DataSource extends Disposable {
 			return this.openGitTerminal(
 				repo,
 				'rebase --interactive ' + (getConfig().signCommits ? '-S ' : '') + (actionOn === RebaseActionOn.Branch ? obj.replace(/'/g, '"\'"') : obj),
-				'Rebase on "' + (actionOn === RebaseActionOn.Branch ? obj : abbrevCommit(obj)) + '"'
+				vscode.l10n.t('ui.rebasingOn', {
+					target: actionOn === RebaseActionOn.Branch ? obj : abbrevCommit(obj)
+				})
 			);
 		} else {
 			const args = ['rebase', obj];
@@ -1108,7 +1104,6 @@ export class DataSource extends Disposable {
 	public archive(repo: string, ref: string, outputFilePath: string, type: 'tar' | 'zip') {
 		return this.runGitCommand(['archive', '--format=' + type, '-o', outputFilePath, ref], repo);
 	}
-
 
 	/* Git Action Methods - Commits */
 
@@ -1172,7 +1167,7 @@ export class DataSource extends Disposable {
 	 */
 	public async dropCommits(repo: string, commits: ReadonlyArray<string>): Promise<ErrorInfo> {
 		if (commits.length === 0) {
-			return 'No commits selected for dropping.';
+			return vscode.l10n.t('ui.noCommitsSelectedToDrop');
 		}
 
 		if (commits.length === 1) {
@@ -1201,9 +1196,8 @@ export class DataSource extends Disposable {
 	 * @returns The ErrorInfo from the executed command.
 	 */
 	public async squashCommits(repo: string, commits: ReadonlyArray<string>, commitMessage: string, noVerify: boolean): Promise<ErrorInfo> {
-
 		if (commits.length < 2) {
-			return 'At least 2 commits are required for squashing.';
+			return vscode.l10n.t('ui.needAtLeastTwoCommitsToSquash');
 		}
 
 		const oldestCommit = commits[commits.length - 1];
@@ -1359,7 +1353,6 @@ export class DataSource extends Disposable {
 		return this.runGitCommand(['config', '--' + location, '--unset-all', key], repo);
 	}
 
-
 	/* Git Action Methods - Uncommitted */
 
 	/**
@@ -1371,7 +1364,6 @@ export class DataSource extends Disposable {
 	public cleanUntrackedFiles(repo: string, directories: boolean) {
 		return this.runGitCommand(['clean', '-f' + (directories ? 'd' : '')], repo);
 	}
-
 
 	/* Git Action Methods - File */
 
@@ -1385,7 +1377,6 @@ export class DataSource extends Disposable {
 	public resetFileToRevision(repo: string, commitHash: string, filePath: string) {
 		return this.runGitCommand(['checkout', commitHash, '--', filePath], repo);
 	}
-
 
 	/* Git Action Methods - Stash */
 
@@ -1460,7 +1451,6 @@ export class DataSource extends Disposable {
 		return this.runGitCommand(args, repo);
 	}
 
-
 	/* Public Utils */
 
 	/**
@@ -1504,7 +1494,7 @@ export class DataSource extends Disposable {
 						}
 					});
 				} else {
-					openGitTerminal(repo, this.gitExecutable.path, args.join(' '), 'Open External Directory Diff');
+					openGitTerminal(repo, this.gitExecutable.path, args.join(' '), vscode.l10n.t('ui.openExternalDirDiff'));
 				}
 				setTimeout(() => resolve(null), 1500);
 			}
@@ -1528,7 +1518,6 @@ export class DataSource extends Disposable {
 			}
 		});
 	}
-
 
 	/* Private Data Providers */
 
@@ -1628,7 +1617,7 @@ export class DataSource extends Disposable {
 					return {};
 				}
 			} else {
-				errorMessage = 'An unexpected error occurred while spawning the Git child process.';
+				errorMessage = vscode.l10n.t('ui.errorStartingGitProcess');
 			}
 			throw errorMessage;
 		});
@@ -1742,11 +1731,10 @@ export class DataSource extends Disposable {
 			// Add the unique list of base hashes of stashes, so that commits only referenced by stashes are displayed
 			const stashBaseHashes = stashes.map((stash) => stash.baseHash);
 			stashBaseHashes.filter((hash, index) => stashBaseHashes.indexOf(hash) === index).forEach((hash) => args.push(hash));
-
 			args.push('HEAD');
 		}
-		args.push('--');
 
+		args.push('--');
 
 
 		return this.spawnGit(args, repo, (stdout) => {

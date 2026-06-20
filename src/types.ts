@@ -96,13 +96,13 @@ export interface GitRepoConfig {
 	readonly remotes: ReadonlyArray<GitRepoSettingsRemote>;
 	readonly user: {
 		readonly name: {
-			readonly local: string | null,
-			readonly global: string | null
-		},
+			readonly local: string | null;
+			readonly global: string | null;
+		};
 		readonly email: {
-			readonly local: string | null,
-			readonly global: string | null
-		}
+			readonly local: string | null;
+			readonly global: string | null;
+		};
 	};
 }
 
@@ -110,7 +110,7 @@ export type GitRepoConfigBranches = { [branchName: string]: GitRepoConfigBranch 
 export interface ActionedUser {
 	name: string;
 	email: string;
-};
+}
 export interface GitRepoConfigBranch {
 	readonly pushRemote: string | null;
 	readonly remote: string | null;
@@ -147,7 +147,6 @@ export interface GitTagDetails {
 	readonly message: string;
 	readonly signature: GitSignature | null;
 }
-
 
 /* Git Repo State */
 
@@ -194,8 +193,8 @@ interface PullRequestConfigBuiltIn extends PullRequestConfigBase {
 interface PullRequestConfigCustom extends PullRequestConfigBase {
 	readonly provider: PullRequestProvider.Custom;
 	readonly custom: {
-		readonly name: string,
-		readonly templateUrl: string
+		readonly name: string;
+		readonly templateUrl: string;
 	};
 }
 
@@ -225,11 +224,15 @@ export interface GitRepoState {
 	isCdvSummaryHidden: boolean;
 }
 
-
 /* Git Graph View Types */
+// Translated text interface
+export interface I18nTexts {
+	readonly [key: string]: string;
+}
 
 export interface GitGraphViewInitialState {
 	readonly config: GitGraphViewConfig;
+	readonly i18n: I18nTexts;
 	readonly lastActiveRepo: string | null;
 	readonly loadViewTo: LoadGitGraphViewTo;
 	readonly repos: GitRepoSet;
@@ -254,7 +257,7 @@ export interface GitGraphViewConfig {
 	readonly graph: GraphConfig;
 	readonly includeCommitsMentionedByReflogs: boolean;
 	readonly initialLoadCommits: number;
-	readonly keybindings: KeybindingConfig
+	readonly keybindings: KeybindingConfig;
 	readonly loadMoreCommits: number;
 	readonly loadMoreCommitsAutomatically: boolean;
 	readonly markdown: boolean;
@@ -271,6 +274,7 @@ export interface GitGraphViewConfig {
 	readonly showTags: boolean;
 	readonly stickyHeader: boolean;
 	readonly toolbarButtonVisibility: ToolbarButtonVisibility;
+	readonly language: string;
 }
 
 export interface GitGraphViewGlobalState {
@@ -333,7 +337,6 @@ export interface ReferenceLabelsConfig {
 	readonly tagLabelsOnRight: boolean;
 }
 
-
 /* Extension Settings Types */
 
 export const enum BooleanOverride {
@@ -346,7 +349,6 @@ export const enum CommitDetailsViewLocation {
 	Inline,
 	DockedToBottom
 }
-
 
 export const enum CommitOrdering {
 	Date = 'date',
@@ -531,7 +533,6 @@ export interface DialogDefaults {
 		readonly includeUntracked: boolean
 	};
 }
-
 export const enum FileViewType {
 	Default,
 	Tree,
@@ -581,7 +582,6 @@ export const enum TagType {
 	Annotated,
 	Lightweight
 }
-
 
 /* Base Interfaces for Request / Response Messages */
 
@@ -1446,7 +1446,6 @@ export type ResponseMessage =
 	| ResponseViewDiffWithWorkingFile
 	| ResponseViewFileAtRevision
 	| ResponseViewScm;
-
 
 /** Helper Types */
 

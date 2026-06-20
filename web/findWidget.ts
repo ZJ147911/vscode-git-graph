@@ -34,7 +34,22 @@ class FindWidget {
 		this.view = view;
 		this.widgetElem = document.createElement('div');
 		this.widgetElem.className = 'findWidget';
-		this.widgetElem.innerHTML = '<input id="findInput" type="text" placeholder="Find" disabled/><span id="findCaseSensitive" class="findModifier" title="Match Case">Aa</span><span id="findRegex" class="findModifier" title="Use Regular Expression">.*</span><span id="findPosition"></span><span id="findPrev" title="Previous match (Shift+Enter)"></span><span id="findNext" title="Next match (Enter)"></span><span id="findOpenCdv" title="Open the Commit Details View for the current match"></span><span id="findClose" title="Close (Escape)"></span>';
+		this.widgetElem.innerHTML =
+			'<input id="findInput" type="text" placeholder="' +
+			getText('ui.findPlaceholder') +
+			'" disabled/><span id="findCaseSensitive" class="findModifier" title="' +
+			getText('ui.findCaseSensitive') +
+			'">Aa</span><span id="findRegex" class="findModifier" title="' +
+			getText('ui.findRegex') +
+			'">.*</span><span id="findPosition"></span><span id="findPrev" title="' +
+			getText('ui.findPreviousMatch') +
+			'"></span><span id="findNext" title="' +
+			getText('ui.findNextMatch') +
+			'"></span><span id="findOpenCdv" title="' +
+			getText('ui.findOpenCommitDetailsView') +
+			'"></span><span id="findClose" title="' +
+			getText('ui.findClose') +
+			'"></span>';
 		document.body.appendChild(this.widgetElem);
 
 		this.inputElem = <HTMLInputElement>document.getElementById('findInput')!;
@@ -161,7 +176,6 @@ class FindWidget {
 		document.body.style.setProperty('--git-graph-findMatchCommit', modifyColourOpacity(colour, 0.5));
 	}
 
-
 	/* State */
 
 	/**
@@ -201,7 +215,6 @@ class FindWidget {
 	public isVisible() {
 		return this.visible;
 	}
-
 
 	/* Matching */
 
@@ -298,7 +311,7 @@ class FindWidget {
 					}
 				}
 				if (zeroLengthMatch) {
-					this.widgetElem.setAttribute(ATTR_ERROR, 'Cannot use a regular expression which has zero length matches');
+					this.widgetElem.setAttribute(ATTR_ERROR, getText('ui.noZeroLengthMatch'));
 					this.clearMatches();
 					this.matches = [];
 				}
@@ -366,7 +379,8 @@ class FindWidget {
 			this.matches[this.position].elem.classList.add(CLASS_FIND_CURRENT_COMMIT);
 			if (scrollToCommit) this.view.scrollToCommit(this.matches[position].hash, false);
 		}
-		this.positionElem.innerHTML = this.matches.length > 0 ? (this.position + 1) + ' of ' + this.matches.length : 'No Results';
+		this.positionElem.innerHTML =
+			this.matches.length > 0 ? this.position + 1 + ' / ' + this.matches.length : getText('ui.noResults');
 		this.view.saveState();
 	}
 

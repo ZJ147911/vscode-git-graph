@@ -9,8 +9,7 @@ import { ExtensionState } from './extensionState';
 import { ErrorInfo, GitFileStatus, GitRepoSet, PullRequestConfig, PullRequestProvider, RepoDropdownOrder } from './types';
 
 export const UNCOMMITTED = '*';
-export const UNABLE_TO_FIND_GIT_MSG = 'Unable to find a Git executable. Either: Set the Visual Studio Code Setting "git.path" to the path and filename of an existing Git executable, or install Git and restart Visual Studio Code.';
-
+export const UNABLE_TO_FIND_GIT_MSG = vscode.l10n.t('ui.unableToFindGit');
 
 /* Path Manipulation */
 
@@ -115,7 +114,6 @@ export function doesFileExist(path: string) {
 		fs.access(path, fs.constants.R_OK, (err) => resolve(err === null));
 	});
 }
-
 
 /* General Methods */
 
@@ -245,7 +243,6 @@ export function getSortedRepositoryPaths(repos: GitRepoSet, order: RepoDropdownO
 	}
 }
 
-
 /* Visual Studio Code Command Wrappers */
 
 /**
@@ -256,27 +253,31 @@ export function getSortedRepositoryPaths(repos: GitRepoSet, order: RepoDropdownO
  * @returns A promise resolving to the ErrorInfo of the executed command.
  */
 export function archive(repo: string, ref: string, dataSource: DataSource): Thenable<ErrorInfo> {
-	return vscode.window.showSaveDialog({
-		defaultUri: vscode.Uri.file(repo),
-		saveLabel: 'Create Archive',
-		filters: { 'TAR Archive': ['tar'], 'ZIP Archive': ['zip'] }
-	}).then(
-		(uri) => {
-			if (uri) {
-				const extension = uri.fsPath.substring(uri.fsPath.lastIndexOf('.') + 1).toLowerCase();
-				if (extension === 'tar' || extension === 'zip') {
-					return dataSource.archive(repo, ref, uri.fsPath, extension);
-				} else {
-					return 'Invalid file extension "*.' + extension + '". The archive file must have a *.tar or *.zip extension.';
-				}
-			} else {
-				return 'No file name was provided for the archive.';
+	return vscode.window
+		.showSaveDialog({
+			defaultUri: vscode.Uri.file(repo),
+			saveLabel: vscode.l10n.t('ui.createArchive'),
+			filters: {
+				[vscode.l10n.t('ui.tarArchive')]: ['tar'],
+				[vscode.l10n.t('ui.zipArchive')]: ['zip']
 			}
-		},
-		() => 'Visual Studio Code was unable to display the save dialog.'
-	);
+		})
+		.then(
+			(uri) => {
+				if (uri) {
+					const extension = uri.fsPath.substring(uri.fsPath.lastIndexOf('.') + 1).toLowerCase();
+					if (extension === 'tar' || extension === 'zip') {
+						return dataSource.archive(repo, ref, uri.fsPath, extension);
+					} else {
+						return vscode.l10n.t('ui.invalidArchiveExtension', { extension });
+					}
+				} else {
+					return vscode.l10n.t('ui.noArchiveFileName');
+				}
+			},
+			() => vscode.l10n.t('ui.cannotShowSaveDialog')
+		);
 }
-
 
 /**
  * Copy the path of a file in a repository to the clipboard.
@@ -297,7 +298,7 @@ export function copyFilePathToClipboard(repo: string, filePath: string, absolute
 export function copyToClipboard(text: string): Thenable<ErrorInfo> {
 	return vscode.env.clipboard.writeText(text).then(
 		() => null,
-		() => 'Visual Studio Code was unable to write to the Clipboard.'
+		() => vscode.l10n.t('ui.cannotWriteToClipboard')
 	);
 }
 
@@ -335,7 +336,7 @@ export function createPullRequest(config: PullRequestConfig, sourceOwner: string
 
 	const url = templateUrl.replace(/\$([1-8])/g, (_, index) => urlFieldValues[parseInt(index) - 1]);
 
-	return openExternalUrl(url, 'Pull Request URL');
+	return openExternalUrl(url, vscode.l10n.t('ui.pullRequestLink'));
 }
 
 /**
@@ -345,7 +346,7 @@ export function createPullRequest(config: PullRequestConfig, sourceOwner: string
 export function openExtensionSettings(): Thenable<ErrorInfo> {
 	return vscode.commands.executeCommand('workbench.action.openSettings', '@ext:hansu.git-graph-2').then(
 		() => null,
-		() => 'Visual Studio Code was unable to open the Git Graph Extension Settings.'
+		() => vscode.l10n.t('ui.cannotOpenExtensionSettings')
 	);
 }
 
@@ -355,8 +356,8 @@ export function openExtensionSettings(): Thenable<ErrorInfo> {
  * @param type The type of URL being opened (defaults to "External URL").
  * @returns A promise resolving to the ErrorInfo of the executed command.
  */
-export function openExternalUrl(url: string, type: string = 'External URL'): Thenable<ErrorInfo> {
-	const getErrorMessage = () => 'Visual Studio Code was unable to open the ' + type + ': ' + url;
+export function openExternalUrl(url: string, type: string = vscode.l10n.t('ui.externalLink')): Thenable<ErrorInfo> {
+	const getErrorMessage = () => vscode.l10n.t('ui.cannotOpen', { type, url });
 	try {
 		return vscode.env.openExternal(vscode.Uri.parse(url)).then(
 			(success) => success ? null : getErrorMessage(),
@@ -398,10 +399,10 @@ export async function openFile(repo: string, filePath: string, hash: string | nu
 			viewColumn: viewColumn === null ? getConfig().openNewTabEditorGroup : viewColumn
 		}).then(
 			() => null,
-			() => 'Visual Studio Code was unable to open ' + newFilePath + '.'
+			() => vscode.l10n.t('ui.cannotOpenFile', { filePath: newFilePath })
 		);
 	} else {
-		return 'The file ' + newFilePath + ' doesn\'t currently exist in this repository.';
+		return vscode.l10n.t('ui.fileDoesNotExist', { filePath: newFilePath });
 	}
 }
 
@@ -417,12 +418,16 @@ export async function openFile(repo: string, filePath: string, hash: string | nu
  */
 export function viewDiff(repo: string, fromHash: string, toHash: string, oldFilePath: string, newFilePath: string, type: GitFileStatus) {
 	if (type !== GitFileStatus.Untracked) {
-		let abbrevFromHash = abbrevCommit(fromHash), abbrevToHash = toHash !== UNCOMMITTED ? abbrevCommit(toHash) : 'Present', pathComponents = newFilePath.split('/');
+		let abbrevFromHash = abbrevCommit(fromHash), abbrevToHash = toHash !== UNCOMMITTED ? abbrevCommit(toHash) : vscode.l10n.t('ui.current'), pathComponents = newFilePath.split('/');
 		let desc = fromHash === toHash
 			? fromHash === UNCOMMITTED
-				? 'Uncommitted'
-				: (type === GitFileStatus.Added ? 'Added in ' + abbrevToHash : type === GitFileStatus.Deleted ? 'Deleted in ' + abbrevToHash : abbrevFromHash + '^ ↔ ' + abbrevToHash)
-			: (type === GitFileStatus.Added ? 'Added between ' + abbrevFromHash + ' & ' + abbrevToHash : type === GitFileStatus.Deleted ? 'Deleted between ' + abbrevFromHash + ' & ' + abbrevToHash : abbrevFromHash + ' ↔ ' + abbrevToHash);
+				? vscode.l10n.t('ui.uncommitted')
+				: type === GitFileStatus.Added ? vscode.l10n.t('ui.addedAt', { commit: abbrevToHash }) : type === GitFileStatus.Deleted	? vscode.l10n.t('ui.deletedAt', { commit: abbrevToHash })	: abbrevFromHash + '^ ↔ ' + abbrevToHash
+			: type === GitFileStatus.Added
+				? vscode.l10n.t('ui.addedBetween', { commit1: abbrevFromHash, commit2: abbrevToHash })
+				: type === GitFileStatus.Deleted
+					? vscode.l10n.t('ui.deletedBetween', { commit1: abbrevFromHash, commit2: abbrevToHash })
+					: abbrevFromHash + ' ↔ ' + abbrevToHash;
 		let title = pathComponents[pathComponents.length - 1] + ' (' + desc + ')';
 		if (fromHash === UNCOMMITTED) fromHash = 'HEAD';
 
@@ -431,7 +436,7 @@ export function viewDiff(repo: string, fromHash: string, toHash: string, oldFile
 			viewColumn: getConfig().openNewTabEditorGroup
 		}).then(
 			() => null,
-			() => 'Visual Studio Code was unable to load the diff editor for ' + newFilePath + '.'
+			() => vscode.l10n.t('ui.cannotLoadDiffEditor', { filePath: newFilePath })
 		);
 	} else {
 		return openFile(repo, newFilePath);
@@ -482,7 +487,7 @@ export function viewFileAtRevision(repo: string, hash: string, filePath: string)
 		viewColumn: getConfig().openNewTabEditorGroup
 	}).then(
 		() => null,
-		() => 'Visual Studio Code was unable to open ' + filePath + ' at commit ' + abbrevCommit(hash) + '.'
+		() => vscode.l10n.t('ui.cannotOpenFileAtRevision', { commit: abbrevCommit(hash), filePath })
 	);
 }
 
@@ -493,7 +498,7 @@ export function viewFileAtRevision(repo: string, hash: string, filePath: string)
 export function viewScm(): Thenable<ErrorInfo> {
 	return vscode.commands.executeCommand('workbench.view.scm').then(
 		() => null,
-		() => 'Visual Studio Code was unable to open the Source Control View.'
+		() => vscode.l10n.t('ui.cannotOpenSourceControlView')
 	);
 }
 
@@ -532,7 +537,6 @@ function isWindows() {
 	return process.platform === 'win32' || process.env.OSTYPE === 'cygwin' || process.env.OSTYPE === 'msys';
 }
 
-
 /* Visual Studio Code API Wrappers */
 
 /**
@@ -550,7 +554,6 @@ export function showInformationMessage(message: string) {
 export function showErrorMessage(message: string) {
 	return vscode.window.showErrorMessage(message).then(() => { }, () => { });
 }
-
 
 /* Promise Methods */
 
@@ -624,7 +627,6 @@ export function resolveSpawnOutput(cmd: cp.ChildProcess) {
 		})
 	]);
 }
-
 
 /* Find Git Executable */
 
@@ -771,7 +773,6 @@ export async function getGitExecutableFromPaths(paths: string[]): Promise<GitExe
 	throw new Error('None of the provided paths are a Git executable');
 }
 
-
 /* Version Handling / Requirements */
 
 export const enum GitVersionRequirement {
@@ -840,5 +841,9 @@ function parseVersion(version: string) {
  * @returns The message for the user.
  */
 export function constructIncompatibleGitVersionMessage(executable: GitExecutable, version: GitVersionRequirement, feature?: string) {
-	return 'A newer version of Git (>= ' + version + ') is required for ' + (feature ? feature : 'this feature') + '. Git ' + executable.version + ' is currently installed. Please install a newer version of Git to use this feature.';
+	return vscode.l10n.t('ui.incompatibleGitVersion', {
+		version,
+		feature: feature || vscode.l10n.t('ui.thisFeature'),
+		currentVersion: executable.version
+	});
 }

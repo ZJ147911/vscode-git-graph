@@ -772,7 +772,6 @@ class Graph {
 		return this.availableColours.length - 1;
 	}
 
-
 	/* Vertex Info */
 
 	private vertexOver(event: MouseEvent) {
@@ -784,6 +783,7 @@ class Graph {
 		this.tooltipId = id;
 		const commitElem = findCommitElemWithId(getCommitElems(), id);
 		if (commitElem !== null) commitElem.classList.add(CLASS_GRAPH_VERTEX_ACTIVE);
+
 
 		if (id < this.commits.length && this.commits[id].hash !== UNCOMMITTED) { // Only show tooltip for commits (not the uncommitted changes)
 			this.tooltipTimeout = setTimeout(() => {
@@ -825,26 +825,52 @@ class Graph {
 			return htmlRefs.join('');
 		};
 
-		let html = '<div class="graphTooltipTitle">Commit ' + abbrevCommit(this.commits[id].hash) + '</div>';
+		let html =
+			'<div class="graphTooltipTitle">' +
+			escapeHtml(getText('ui.graphTooltipCommitTitle', abbrevCommit(this.commits[id].hash))) +
+			'</div>';
 		if (this.commitHead !== null && typeof this.commitLookup[this.commitHead] === 'number') {
-			html += '<div class="graphTooltipSection">This commit is ' + (childrenIncludesHead ? '' : '<b><i>not</i></b> ') + 'included in <span class="graphTooltipRef">HEAD</span></div>';
+			html +=
+				'<div class="graphTooltipSection">' +
+				(childrenIncludesHead
+					? getText('ui.graphTooltipIncludedInHead')
+					: getText('ui.graphTooltipNotIncludedInHead')) +
+				'</div>';
 		}
 		if (heads.length > 0 || remotes.length > 0) {
-			let branchLabels = getBranchLabels(heads, remotes), htmlRefs: string[] = [];
+			let branchLabels = getBranchLabels(heads, remotes),
+				htmlRefs: string[] = [];
 			branchLabels.heads.forEach((head) => {
-				let html = head.remotes.reduce((prev, remote) => prev + '<span class="graphTooltipCombinedRef">' + escapeHtml(remote) + '</span>', '');
+				let html = head.remotes.reduce(
+					(prev, remote) => prev + '<span class="graphTooltipCombinedRef">' + escapeHtml(remote) + '</span>',
+					''
+				);
 				htmlRefs.push('<span class="graphTooltipRef">' + escapeHtml(head.name) + html + '</span>');
 			});
-			branchLabels.remotes.forEach((remote) => htmlRefs.push('<span class="graphTooltipRef">' + escapeHtml(remote.name) + '</span>'));
-			html += '<div class="graphTooltipSection">Branches: ' + getLimitedRefs(htmlRefs) + '</div>';
+			branchLabels.remotes.forEach((remote) =>
+				htmlRefs.push('<span class="graphTooltipRef">' + escapeHtml(remote.name) + '</span>')
+			);
+			html +=
+				'<div class="graphTooltipSection">' +
+				escapeHtml(getText('ui.graphTooltipBranches')) +
+				getLimitedRefs(htmlRefs) +
+				'</div>';
 		}
 		if (tags.length > 0) {
 			let htmlRefs = tags.map((tag) => '<span class="graphTooltipRef">' + escapeHtml(tag) + '</span>');
-			html += '<div class="graphTooltipSection">Tags: ' + getLimitedRefs(htmlRefs) + '</div>';
+			html +=
+				'<div class="graphTooltipSection">' +
+				escapeHtml(getText('ui.graphTooltipTags')) +
+				getLimitedRefs(htmlRefs) +
+				'</div>';
 		}
 		if (stashes.length > 0) {
 			let htmlRefs = stashes.map((stash) => '<span class="graphTooltipRef">' + escapeHtml(stash) + '</span>');
-			html += '<div class="graphTooltipSection">Stashes: ' + getLimitedRefs(htmlRefs) + '</div>';
+			html +=
+				'<div class="graphTooltipSection">' +
+				escapeHtml(getText('ui.graphTooltipStashes')) +
+				getLimitedRefs(htmlRefs) +
+				'</div>';
 		}
 
 		const point = this.vertices[id].getPoint(), color = 'var(--git-graph-color' + (this.vertices[id].getColour() % this.config.colours.length) + ')';
@@ -853,6 +879,7 @@ class Graph {
 			x: point.x * this.config.grid.x + this.config.grid.offsetX,
 			y: point.y * this.config.grid.y + this.config.grid.offsetY + (this.expandedCommitIndex > -1 && id > this.expandedCommitIndex ? this.config.grid.expandY : 0)
 		};
+
 
 		anchor.setAttribute('id', 'graphTooltip');
 		anchor.style.opacity = '0';

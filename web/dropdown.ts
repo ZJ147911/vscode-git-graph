@@ -52,19 +52,19 @@ class Dropdown {
 
 		this.filterInput = filter.appendChild(document.createElement('input'));
 		this.filterInput.className = 'dropdownFilterInput';
-		this.filterInput.placeholder = 'Filter ' + dropdownType + '...';
+		this.filterInput.placeholder = getText('ui.filter') + ' ' + dropdownType + '...';
 
 		this.optionsElem = this.menuElem.appendChild(document.createElement('div'));
 		this.optionsElem.className = 'dropdownOptions';
 
 		this.noResultsElem = this.menuElem.appendChild(document.createElement('div'));
 		this.noResultsElem.className = 'dropdownNoResults';
-		this.noResultsElem.innerHTML = 'No results found.';
+		this.noResultsElem.innerHTML = getText('ui.noResults');
 
 		this.currentValueElem = this.elem.appendChild(document.createElement('div'));
 		this.currentValueElem.className = 'dropdownCurrentValue';
 
-		alterClass(this.elem, 'multi', (multipleAllowed && !selectMultipleWithCtrl));
+		alterClass(this.elem, 'multi', multipleAllowed && !selectMultipleWithCtrl);
 		this.elem.appendChild(this.menuElem);
 
 		document.addEventListener('click', (e) => {
@@ -171,7 +171,6 @@ class Dropdown {
 			this.menuElem.scroll(0, menuScroll);
 		}
 		this.changeCallback(this.getSelectedOptions(false));
-
 	}
 
 	/**

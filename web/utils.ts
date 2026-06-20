@@ -49,16 +49,58 @@ const SVG_ICONS = {
 	collapse: '<svg style="transform: rotate(-90deg);" width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd"  d="M14.207 1.707L13.5 1L7.49997 7L1.49997 1L0.792969 1.707L7.14597 8.061H7.85397L14.207 1.707ZM14.207 7.70688L13.5 6.99988L7.49997 12.9999L1.49997 6.99988L0.792969 7.70688L7.14597 14.0609H7.85397L14.207 7.70688Z"/></svg>'
 };
 
-const GIT_FILE_CHANGE_TYPES = { 'A': 'Added', 'M': 'Modified', 'D': 'Deleted', 'R': 'Renamed', 'U': 'Untracked' };
-const GIT_SIGNATURE_STATUS_DESCRIPTIONS = {
-	'G': 'Valid Signature',
-	'U': 'Good Signature with Unknown Validity',
-	'X': 'Good Signature that has Expired',
-	'Y': 'Good Signature made by an Expired Key',
-	'R': 'Good Signature made by a Revoked Key',
-	'E': 'Signature could not be checked',
-	'B': 'Bad Signature'
+
+// Translated texts
+// The full default values are injected at build time by package-web.js from package.nls.json (media/i18n-defaults.js).
+// Only a minimal fallback is kept here for debugging in unpackaged environments.
+const DEFAULT_I18N_TEXTS: Record<string, string> = {
+	'ui.error': 'Error',
+	'ui.close': 'Close',
+	'ui.cancel': 'Cancel'
 };
+
+let i18nTexts: Record<string, string> = DEFAULT_I18N_TEXTS;
+
+// Set translated texts (merged with extension-provided texts to avoid missing keys)
+function setI18nTexts(texts: any) {
+	i18nTexts = Object.assign({}, DEFAULT_I18N_TEXTS, texts && typeof texts === 'object' ? texts : {});
+}
+
+function getGitFileChangeTypeLabel(code: string): string {
+	const map: Record<string, string> = {
+		A: getText('git.fileChangeTypes.added'),
+		M: getText('git.fileChangeTypes.modified'),
+		D: getText('git.fileChangeTypes.deleted'),
+		R: getText('git.fileChangeTypes.renamed'),
+		U: getText('git.fileChangeTypes.untracked')
+	};
+	return map[code] ?? code;
+}
+
+function getGitSignatureStatusDescription(code: string): string {
+	const map: Record<string, string> = {
+		G: getText('git.signatureStatusDescriptions.valid'),
+		U: getText('git.signatureStatusDescriptions.unknown'),
+		X: getText('git.signatureStatusDescriptions.expired'),
+		Y: getText('git.signatureStatusDescriptions.expiredKey'),
+		R: getText('git.signatureStatusDescriptions.revokedKey'),
+		E: getText('git.signatureStatusDescriptions.unchecked'),
+		B: getText('git.signatureStatusDescriptions.bad')
+	};
+	return map[code] ?? '';
+}
+
+// Get translated text (keys use the ui.camelCase or git.*.camelCase form)
+function getText(key: string, ...args: any[]) {
+	let text: string | undefined = i18nTexts[key];
+	if (typeof text === 'string' && args.length > 0) {
+		for (let i = 0; i < args.length; i++) {
+			text = text.replace(`{${i}}`, String(args[i]));
+		}
+	}
+	return text ?? key;
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const REF_INVALID_REGEX = /^[-\/].*|[\\" ><~^:?*[]|\.\.|\/\/|\/\.|@{|[.\/]$|\.lock$|^@$/g;
 
@@ -105,7 +147,6 @@ const CSS_PROP_SELECTION_BACKGROUND = '--vscode-selection-background';
 const CSS_PROP_LIMIT_GRAPH_WIDTH = '--limitGraphWidth';
 
 const ATTR_ERROR = 'data-error';
-
 
 /* General Helpers */
 
@@ -227,7 +268,6 @@ function getSortedRepositoryPaths(repos: GG.GitRepoSet, order: GG.RepoDropdownOr
 	}
 }
 
-
 /* HTML Escape / Unescape */
 
 /**
@@ -247,7 +287,6 @@ function escapeHtml(str: string) {
 function unescapeHtml(str: string) {
 	return str.replace(HTML_UNESCAPER_REGEX, (match) => HTML_UNESCAPES[match]);
 }
-
 
 /* Formatters */
 
@@ -329,7 +368,6 @@ function formatLongDate(unixTimestamp: number) {
 		return date.toString();
 	}
 }
-
 
 /* DOM Helpers */
 
@@ -509,7 +547,6 @@ function handledEvent(event: Event) {
 	event.stopPropagation();
 }
 
-
 /* State Helpers */
 
 /**
@@ -560,7 +597,6 @@ function getVSCodeStyle(name: string) {
 	return document.documentElement.style.getPropertyValue(name);
 }
 
-
 /**
  * Resizes images for the view (e.g. commit author avatars).
  */
@@ -599,7 +635,6 @@ class ImageResizer {
 		image.src = dataUri;
 	}
 }
-
 
 /**
  * Implements an Event Overlay, which is used for blocking and/or capturing mouse events in the view.

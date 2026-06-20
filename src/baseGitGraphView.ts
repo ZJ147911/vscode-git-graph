@@ -7,8 +7,10 @@ import { ExtensionState } from './extensionState';
 import { Logger } from './logger';
 import { RepoFileWatcher } from './repoFileWatcher';
 import { RepoManager } from './repoManager';
-import { ErrorInfo, GitConfigLocation, GitGraphViewInitialState, GitPushBranchMode, GitRepoSet, LoadGitGraphViewTo, RequestDropCommits, RequestMessage, RequestSquashCommits, ResponseMessage } from './types';
+import { ErrorInfo, GitConfigLocation, GitGraphViewInitialState, GitPushBranchMode, GitRepoSet, I18nTexts, LoadGitGraphViewTo, RequestDropCommits, RequestMessage, RequestSquashCommits, ResponseMessage } from './types';
 import { UNABLE_TO_FIND_GIT_MSG, UNCOMMITTED, archive, copyFilePathToClipboard, copyToClipboard, createPullRequest, getNonce, openExtensionSettings, openExternalUrl, openFile, showErrorMessage, viewDiff, viewDiffWithWorkingFile, viewFileAtRevision, viewScm } from './utils';
+import { createWebviewNlsTranslator } from './utils/nlsWebview';
+import { mergeAllWebviewNls } from './utils/webviewExtraNls';
 import { Disposable, toDisposable } from './utils/disposable';
 
 /**
@@ -533,7 +535,7 @@ export abstract class BaseGitGraphView extends Disposable {
 				break;
 			case 'rescanForRepos':
 				if (!(await this.repoManager.searchWorkspaceForRepos())) {
-					showErrorMessage('No Git repositories were found in the current workspace.');
+					showErrorMessage(vscode.l10n.t('ui.noGitRepositoriesFound'));
 				}
 				break;
 			case 'resetFileToRevision':
@@ -668,7 +670,14 @@ export abstract class BaseGitGraphView extends Disposable {
 	 * @returns The HTML.
 	 */
 	protected getHtmlForWebview() {
-		const config = getConfig(), nonce = getNonce();
+		const config = getConfig(),
+			nonce = getNonce();
+		// Create NLS translator for webview strings
+		const wt = createWebviewNlsTranslator(this.extensionPath, config.language);
+		// Build i18n object with extra NLS keys and user prompt keys
+		const i18n: I18nTexts = {
+			...mergeAllWebviewNls(wt)
+		};
 		const initialState: GitGraphViewInitialState = {
 			config: {
 				commitDetailsView: config.commitDetailsView,
@@ -689,6 +698,7 @@ export abstract class BaseGitGraphView extends Disposable {
 				includeCommitsMentionedByReflogs: config.includeCommitsMentionedByReflogs,
 				initialLoadCommits: config.initialLoadCommits,
 				keybindings: config.keybindings,
+				language: config.language,
 				loadMoreCommits: config.loadMoreCommits,
 				loadMoreCommitsAutomatically: config.loadMoreCommitsAutomatically,
 				markdown: config.markdown,
@@ -705,6 +715,7 @@ export abstract class BaseGitGraphView extends Disposable {
 				showTags: config.showTags,
 				toolbarButtonVisibility: config.toolbarButtonVisibility
 			},
+			i18n: i18n as any,
 			lastActiveRepo: this.extensionState.getLastActiveRepo(),
 			loadViewTo: this.loadViewTo,
 			repos: this.repoManager.getRepos(),
@@ -722,7 +733,7 @@ export abstract class BaseGitGraphView extends Disposable {
 
 		if (this.dataSource.isGitExecutableUnknown()) {
 			body = `<body class="unableToLoad">
-			<h2>Unable to load Git Graph</h2>
+			<h2>${wt('ui.unableToLoadGitGraph')}</h2>
 			<p class="unableToLoadMessage">${UNABLE_TO_FIND_GIT_MSG}</p>
 			</body>`;
 		} else if (numRepos > 0) {
@@ -733,15 +744,15 @@ export abstract class BaseGitGraphView extends Disposable {
 			body = `<body>
 			<div id="view" tabindex="-1">
 				<div id="controls"${stickyClassAttr}>
-					<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoDropdown" class="dropdown"></div></span>
-					<span id="branchControl"><span class="unselectable">Branches: </span><div id="branchDropdown" class="dropdown"></div></span>
-					<span id="authorControl"><span class="unselectable">Authors: </span><div id="authorDropdown" class="dropdown"></div></span>
-					<label ${hideRemotes} id="showRemoteBranchesControl" title="Show Remote Branches"><input type="checkbox" id="showRemoteBranchesCheckbox" tabindex="-1"><span class="customCheckbox"></span>Remotes</label>
-					<label ${hideSimplify} id="simplifyByDecorationControl" title="Simplify By Decoration"><input type="checkbox" id="simplifyByDecorationCheckbox" tabindex="-1"><span class="customCheckbox"></span>Simplify</label>
-					<div id="currentBtn" title="Current"></div>
-					<div id="findBtn" title="Find"></div>
-					<div id="terminalBtn" title="Open a Terminal for this Repository"></div>
-					<div id="settingsBtn" title="Repository Settings"></div>
+					<span id="repoControl"><span class="unselectable">${wt('ui.repo')}: </span><div id="repoDropdown" class="dropdown"></div></span>
+					<span id="branchControl"><span class="unselectable">${wt('ui.branches')}: </span><div id="branchDropdown" class="dropdown"></div></span>
+					<span id="authorControl"><span class="unselectable">${wt('ui.authors')}: </span><div id="authorDropdown" class="dropdown"></div></span>
+					<label ${hideRemotes} id="showRemoteBranchesControl" title="${wt('ui.showRemoteBranches')}"><input type="checkbox" id="showRemoteBranchesCheckbox" tabindex="-1"><span class="customCheckbox"></span>${wt('ui.remotes')}</label>
+					<label ${hideSimplify} id="simplifyByDecorationControl" title="${wt('ui.simplifyByDecoration')}"><input type="checkbox" id="simplifyByDecorationCheckbox" tabindex="-1"><span class="customCheckbox"></span>${wt('ui.simplify')}</label>
+					<div id="currentBtn" title="${wt('ui.current')}"></div>
+					<div id="findBtn" title="${wt('ui.find')}"></div>
+					<div id="terminalBtn" title="${wt('ui.openTerminal')}"></div>
+					<div id="settingsBtn" title="${wt('ui.repositorySettings')}"></div>
 					<div id="fetchBtn"></div>
 					<div id="refreshBtn"></div>
 				</div>
@@ -756,10 +767,10 @@ export abstract class BaseGitGraphView extends Disposable {
 			</body>`;
 		} else {
 			body = `<body class="unableToLoad">
-			<h2>Unable to load Git Graph</h2>
-			<p class="unableToLoadMessage">No Git repositories were found in the current workspace when it was last scanned by Git Graph.</p>
-			<p>If your repositories are in subfolders of the open workspace folder(s), make sure you have set the Git Graph Setting "git-graph.maxDepthOfRepoSearch" appropriately (read the <a href="https://github.com/hansu/vscode-git-graph/wiki/Extension-Settings#max-depth-of-repo-search" target="_blank">documentation</a> for more information).</p>
-			<p><div id="rescanForReposBtn" class="roundedBtn">Re-scan the current workspace for repositories</div></p>
+			<h2>${wt('ui.unableToLoadGitGraph')}</h2>
+			<p class="unableToLoadMessage">${wt('ui.noGitRepositoriesFound')}</p>
+			<p>${wt('ui.maxDepthOfRepoSearchHelp')}</p>
+			<p><div id="rescanForReposBtn" class="roundedBtn">${wt('ui.rescanForRepos')}</div></p>
 			<script nonce="${nonce}">(function(){ var api = acquireVsCodeApi(); document.getElementById('rescanForReposBtn').addEventListener('click', function(){ api.postMessage({command: 'rescanForRepos'}); }); })();</script>
 			</body>`;
 		}
