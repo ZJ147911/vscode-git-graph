@@ -8,14 +8,5 @@
     "task.problemMatchers.neverPrompt": {
         "npm": true
     },
-    "[typescript]": {
-        "editor.formatOnSave": true,
-    },
-    "[javascript]": {
-        "editor.formatOnSave": true,
-    },
-    "[jsonc]": {
-        "editor.formatOnSave": true,
-    },
     "typescript.tsdk": "./node_modules/typescript/lib"
 }

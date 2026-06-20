@@ -1665,6 +1665,7 @@
 		"compile-web": "tsc -p ./web && node ./scripts/generate-i18n-defaults.js && node ./.vscode/package-web.js",
 		"compile-web-debug": "tsc -p ./web && node ./.vscode/package-web.js debug",
 		"lint": "eslint --max-warnings 0 ./src ./tests ./web",
+		"watch": "node ./watch.js",
 		"package": "vsce package",
 		"package-and-install": "npm run package && node ./.vscode/install-package.js",
 		"test": "jest --verbose",
