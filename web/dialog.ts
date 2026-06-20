@@ -346,11 +346,13 @@ class Dialog {
 	 * @param type The type of dialog being shown.
 	 * @param html The HTML content for the dialog.
 	 * @param actionName The name of the primary (default) action.
-	 * @param secondaryActionName The name of the secondary action.
-	 * @param actioned A callback to be invoked when the primary (default) action is selected by the user.
-	 * @param secondaryActioned A callback to be invoked when the secondary action is selected by the user.
-	 * @param target The target that the dialog was triggered on.
+	 * Show a custom dialog with full control over content and callbacks, including a close callback.
 	 */
+	public showCustom(html: string, actionName: string, actioned: () => void, secondaryActionName: string, secondaryActioned: () => void, onClose: (() => void) | null) {
+		this.show(DialogType.Form, html, actionName, secondaryActionName, actioned, secondaryActioned, null);
+		this.onCloseCallback = onClose;
+	}
+
 	private show(type: DialogType, html: string, actionName: string | null, secondaryActionName: string, actioned: (() => void) | null, secondaryActioned: (() => void) | null, target: DialogTarget | null) {
 		closeDialogAndContextMenu();
 

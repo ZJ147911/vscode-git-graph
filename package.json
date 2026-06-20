@@ -611,11 +611,16 @@
 						"Simplify": {
 							"type": "boolean",
 							"title": "%configuration.toolbarButtonVisibility.Simplify%"
+						},
+						"Paths": {
+							"type": "boolean",
+							"title": "%configuration.toolbarButtonVisibility.Paths%"
 						}
 					},
 					"default": {
 						"Remotes": true,
-						"Simplify": true
+						"Simplify": true,
+						"Paths": true
 					},
 					"description": "%configuration.toolbarButtonVisibility%"
 				},

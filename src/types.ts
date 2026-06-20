@@ -222,6 +222,7 @@ export interface GitRepoState {
 	simplifyByDecoration: BooleanOverride;
 	showStashes: BooleanOverride;
 	showTags: BooleanOverride;
+	pathFilter: string | null;
 	workspaceFolderIndex: number | null;
 	isCdvSummaryHidden: boolean;
 	pathFilter: string | null;
@@ -483,6 +484,7 @@ export interface DefaultColumnVisibility {
 export interface ToolbarButtonVisibility {
 	readonly remotes: boolean;
 	readonly simplify: boolean;
+	readonly pathFilter: boolean;
 }
 
 export interface DialogDefaults {
@@ -1149,6 +1151,22 @@ export const enum RebaseActionOn {
 	Branch = 'Branch',
 	Commit = 'Commit'
 }
+export const enum RebaseTodoAction {
+	Pick = 'pick',
+	Reword = 'reword',
+	Edit = 'edit',
+	Squash = 'squash',
+	Fixup = 'fixup',
+	Drop = 'drop'
+}
+export interface RebaseTodoItem {
+	readonly hash: string;
+	readonly subject: string;
+}
+export interface RebaseTodoEntry {
+	readonly hash: string;
+	readonly action: RebaseTodoAction;
+}
 export interface RequestRebase extends RepoRequest {
 	readonly command: 'rebase';
 	readonly obj: string;
@@ -1161,6 +1179,26 @@ export interface ResponseRebase extends ResponseWithErrorInfo {
 	readonly command: 'rebase';
 	readonly actionOn: RebaseActionOn;
 	readonly interactive: boolean;
+}
+export interface RequestGetRebaseTodoList extends RepoRequest {
+	readonly command: 'getRebaseTodoList';
+	readonly obj: string;
+	readonly actionOn: RebaseActionOn;
+}
+export interface ResponseGetRebaseTodoList extends BaseMessage {
+	readonly command: 'getRebaseTodoList';
+	readonly items: ReadonlyArray<RebaseTodoItem> | null;
+	readonly error: ErrorInfo;
+}
+export interface RequestRebaseInteractive extends RepoRequest {
+	readonly command: 'rebaseInteractive';
+	readonly obj: string;
+	readonly actionOn: RebaseActionOn;
+	readonly entries: ReadonlyArray<RebaseTodoEntry>;
+	readonly signoff: boolean;
+}
+export interface ResponseRebaseInteractive extends ResponseWithErrorInfo {
+	readonly command: 'rebaseInteractive';
 }
 
 export const enum RebaseTodoAction {

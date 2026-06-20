@@ -45,10 +45,18 @@ class GitGraphView {
 		hash: string | null
 	} = { time: 0, hash: null };
 
+	private pendingRebaseTodo: {
+		repo: string;
+		obj: string;
+		actionOn: GG.RebaseActionOn;
+		signoff: boolean;
+	} | null = null;
+
 	private readonly findWidget: FindWidget;
 	private readonly settingsWidget: SettingsWidget;
 	private readonly repoDropdown: Dropdown;
 	private readonly branchDropdown: Dropdown;
+	private readonly pathFilterDropdown: Dropdown;
 	private readonly authorDropdown: Dropdown;
 	private readonly pathFilterDropdown: Dropdown;
 
@@ -59,6 +67,7 @@ class GitGraphView {
 	private readonly footerElem: HTMLElement;
 	private readonly showRemoteBranchesElem: HTMLInputElement;
 	private readonly simplifyByDecorationElem: HTMLInputElement;
+	private workspaceFolderPaths: { readonly [repo: string]: readonly string[] };
 	private readonly refreshBtnElem: HTMLElement;
 
 	constructor(viewElem: HTMLElement, prevState: WebViewState | null) {
@@ -124,6 +133,16 @@ class GitGraphView {
 			this.refresh(true);
 		});
 
+		this.workspaceFolderPaths = initialState.workspaceFolderPaths;
+		this.pathFilterDropdown = new Dropdown('pathFilterDropdown', false, false, 'Paths', (values) => {
+			this.handlePathFilterChange(values[0]);
+		}, false, (value) => {
+			this.saveRepoStateValue(this.currentRepo, 'pathFilter', value);
+			this.maxCommits = this.config.initialLoadCommits;
+			this.refresh(true);
+			this.restorePathFilterState(this.currentRepo);
+		});
+
 		this.refreshBtnElem = document.getElementById('refreshBtn')!;
 		this.refreshBtnElem.addEventListener('click', () => {
 			if (!this.refreshBtnElem.classList.contains(CLASS_REFRESHING)) {
@@ -160,6 +179,7 @@ class GitGraphView {
 			this.settingsWidget.restoreState(prevState.settingsWidget);
 			this.showRemoteBranchesElem.checked = getShowRemoteBranches(this.gitRepos[prevState.currentRepo].showRemoteBranchesV2);
 			this.simplifyByDecorationElem.checked = getSimplifyByDecoration(this.gitRepos[prevState.currentRepo].simplifyByDecoration);
+			this.restorePathFilterState(prevState.currentRepo);
 		}
 
 		let loadViewTo = initialState.loadViewTo;
@@ -218,6 +238,9 @@ class GitGraphView {
 
 	public loadRepos(repos: GG.GitRepoSet, lastActiveRepo: string | null, loadViewTo: GG.LoadGitGraphViewTo) {
 		this.gitRepos = repos;
+		if (workspaceFolderPaths) {
+			this.workspaceFolderPaths = workspaceFolderPaths;
+		}
 		this.saveState();
 
 		let newRepo: string;
@@ -245,11 +268,22 @@ class GitGraphView {
 			this.loadViewTo = null;
 		}
 
+		if (this.loadViewTo !== null && this.loadViewTo.pathFilter !== undefined) {
+			this.gitRepos[this.loadViewTo.repo].pathFilter = this.loadViewTo.pathFilter;
+			sendMessage({ command: 'setRepoState', repo: this.loadViewTo.repo, state: this.gitRepos[this.loadViewTo.repo] });
+		}
+
 		if (this.currentRepo !== newRepo) {
 			this.loadRepo(newRepo);
 			return true;
 		} else {
-			this.finaliseRepoLoad(false);
+			this.restorePathFilterState(this.currentRepo);
+			if (this.loadViewTo !== null && this.loadViewTo.pathFilter !== undefined) {
+				this.maxCommits = this.config.initialLoadCommits;
+				this.refresh(true);
+			} else {
+				this.finaliseRepoLoad(false);
+			}
 			return false;
 		}
 	}
@@ -272,6 +306,80 @@ class GitGraphView {
 		this.settingsWidget.close();
 		this.saveState();
 		this.refresh(true);
+	}
+
+	private restorePathFilterState(repo: string) {
+		const repoState = this.gitRepos[repo];
+		const options = this.getPathFilterOptions();
+		const wsPaths = this.workspaceFolderPaths[repo] || [];
+
+		let selectedValue: string;
+		if (repoState.pathFilter === PATH_FILTER_WS_ALL && wsPaths.length > 0) {
+			selectedValue = wsPaths.length === 1 ? wsPaths[0] : PATH_FILTER_WS_ALL;
+		} else if (repoState.pathFilter !== null && repoState.pathFilter !== PATH_FILTER_WS_ALL) {
+			const matchingOption = options.find((o) => o.value === repoState.pathFilter);
+			selectedValue = matchingOption ? repoState.pathFilter : SHOW_ALL_BRANCHES;
+		} else {
+			selectedValue = SHOW_ALL_BRANCHES;
+		}
+
+		this.pathFilterDropdown.setOptions(options, [selectedValue]);
+		this.updateSimplifyState();
+	}
+
+	private isPathFilterActive(): boolean {
+		const repoState = this.gitRepos[this.currentRepo];
+		if (repoState.pathFilter === PATH_FILTER_WS_ALL) {
+			const paths = this.workspaceFolderPaths[this.currentRepo] || [];
+			return paths.length > 0;
+		}
+		return repoState.pathFilter !== null;
+	}
+
+	private updateSimplifyState() {
+		const pathActive = this.isPathFilterActive();
+		this.simplifyByDecorationElem.disabled = pathActive;
+		const label = document.getElementById('simplifyByDecorationControl')!;
+		if (pathActive) {
+			label.classList.add(CLASS_DISABLED);
+		} else {
+			label.classList.remove(CLASS_DISABLED);
+		}
+	}
+
+	private getPathFilterOptions(): DropdownOption[] {
+		const options: DropdownOption[] = [{ name: 'All', value: SHOW_ALL_BRANCHES }];
+		const wsPaths = this.workspaceFolderPaths[this.currentRepo] || [];
+		if (wsPaths.length > 1) {
+			options.push({ name: 'Workspace (all)', value: PATH_FILTER_WS_ALL });
+		}
+		for (const p of wsPaths) {
+			options.push({ name: p, value: p });
+		}
+		// Custom paths can be entered via the dropdown's filter input (Enter key)
+		const repoState = this.gitRepos[this.currentRepo];
+		if (repoState.pathFilter !== null && repoState.pathFilter !== PATH_FILTER_WS_ALL && !wsPaths.includes(repoState.pathFilter)) {
+			options.push({ name: repoState.pathFilter, value: repoState.pathFilter });
+		}
+		return options;
+	}
+
+	private handlePathFilterChange(selected: string) {
+		if (selected === SHOW_ALL_BRANCHES) {
+			this.saveRepoStateValue(this.currentRepo, 'pathFilter', null);
+		} else if (selected === PATH_FILTER_WS_ALL) {
+			this.saveRepoStateValue(this.currentRepo, 'pathFilter', PATH_FILTER_WS_ALL);
+		} else {
+			this.saveRepoStateValue(this.currentRepo, 'pathFilter', selected);
+		}
+		this.maxCommits = this.config.initialLoadCommits;
+		this.updateSimplifyState();
+		this.refresh(true);
+	}
+
+	private getWorkspacePathsForCurrentRepo(): string | null {
+		const paths = this.workspaceFolderPaths[this.currentRepo] || [];
+		return paths.length > 0 ? paths.join(', ') : null;
 	}
 
 	private loadRepoInfo(branchOptions: ReadonlyArray<string>, branchHead: string | null, remotes: ReadonlyArray<string>, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
@@ -360,7 +468,7 @@ class GitGraphView {
 		}
 	}
 
-	private loadCommits(commits: GG.GitCommit[], commitHead: string | null, tags: ReadonlyArray<string>, moreAvailable: boolean, onlyFollowFirstParent: boolean) {
+	private loadCommits(commits: GG.GitCommit[], commitHead: string | null, tags: ReadonlyArray<string>, moreAvailable: boolean, onlyFollowFirstParent: boolean, pathFilterActive: boolean = false) {
 		// This list of tags is just used to provide additional information in the dialogs. Tag information included in commits is used for all other purposes (e.g. rendering, context menus)
 		const tagsChanged = !arraysStrictlyEqual(this.gitTags, tags);
 		this.gitTags = tags;
@@ -432,7 +540,7 @@ class GitGraphView {
 
 		this.saveState();
 
-		this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup, this.onlyFollowFirstParent);
+		this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup, this.onlyFollowFirstParent, pathFilterActive);
 		this.render();
 
 		if (currentRepoLoading && this.config.onRepoLoad.scrollToHead && this.commitHead !== null) {
@@ -535,7 +643,7 @@ class GitGraphView {
 		if (msg.error === null) {
 			const refreshState = this.currentRepoRefreshState;
 			if (refreshState.inProgress && refreshState.loadCommitsRefreshId === msg.refreshId) {
-				this.loadCommits(msg.commits, msg.head, msg.tags, msg.moreCommitsAvailable, msg.onlyFollowFirstParent);
+				this.loadCommits(msg.commits, msg.head, msg.tags, msg.moreCommitsAvailable, msg.onlyFollowFirstParent, msg.pathFilterActive);
 			}
 		} else {
 			const error = this.gitBranches.length === 0 && msg.error.indexOf('bad revision \'HEAD\'') > -1
@@ -616,7 +724,9 @@ class GitGraphView {
 
 	private getCommitOfElem(elem: HTMLElement) {
 		let id = parseInt(elem.dataset.id!);
-		return id < this.commits.length ? this.commits[id] : null;
+		if (id >= this.commits.length) return null;
+		const commit = this.commits[id];
+		return commit;
 	}
 
 	public getCommits(): ReadonlyArray<GG.GitCommit> {
@@ -698,7 +808,7 @@ class GitGraphView {
 			maxCommits: this.maxCommits,
 			showTags: getShowTags(repoState.showTags),
 			showRemoteBranches: getShowRemoteBranches(repoState.showRemoteBranchesV2),
-			simplifyByDecoration: getSimplifyByDecoration(repoState.simplifyByDecoration),
+			simplifyByDecoration: this.isPathFilterActive() ? false : getSimplifyByDecoration(repoState.simplifyByDecoration),
 			includeCommitsMentionedByReflogs: getIncludeCommitsMentionedByReflogs(repoState.includeCommitsMentionedByReflogs),
 			onlyFollowFirstParent: getOnlyFollowFirstParent(repoState.onlyFollowFirstParent),
 			commitOrdering: getCommitOrdering(repoState.commitOrdering),
@@ -1128,6 +1238,7 @@ class GitGraphView {
 		const vertexColours = this.graph.getVertexColours();
 		const widthsAtVertices = this.config.referenceLabels.branchLabelsAlignedToGraph ? this.graph.getWidthsAtVertices() : [];
 		const mutedCommits = this.graph.getMutedCommits(currentHash);
+		const dimmedCommits = this.graph.getPathFilterDimmedCommits();
 		const textFormatter = new TextFormatter(this.commits, this.gitRepos[this.currentRepo].issueLinkingConfig, {
 			emoji: true,
 			issueLinking: true,
@@ -1142,6 +1253,7 @@ class GitGraphView {
 
 		for (let i = 0; i < this.commits.length; i++) {
 			let commit = this.commits[i];
+
 			let message = '<span class="text">' + textFormatter.format(commit.message) + '</span>';
 			let date = formatShortDate(commit.date);
 			let branchLabels = getBranchLabels(commit.heads, commit.remotes);
@@ -1181,7 +1293,7 @@ class GitGraphView {
 				) + '."></span>'
 				: '';
 
-			html += '<tr class="commit' + (commit.hash === currentHash ? ' current' : '') + (mutedCommits[i] ? ' mute' : '') + '"' + (commit.hash !== UNCOMMITTED ? '' : ' id="uncommittedChanges"') + ' data-id="' + i + '" data-color="' + vertexColours[i] + '">' +
+			html += '<tr class="commit' + (commit.hash === currentHash ? ' current' : '') + (mutedCommits[i] ? ' mute' : '') + (dimmedCommits[i] ? ' pathDimmed' : '') + '"' + (commit.hash !== UNCOMMITTED ? '' : ' id="uncommittedChanges"') + ' data-id="' + i + '" data-color="' + vertexColours[i] + '">' +
 				(this.config.referenceLabels.branchLabelsAlignedToGraph ? '<td>' + getResizeColHtml(0) + (refBranches !== '' ? '<span style="margin-left:' + (widthsAtVertices[i] - 4) + 'px"' + refBranches.substring(5) : '') + '</td><td>' + getResizeColHtml(1) + '<span class="description">' + commitDot : '<td>' + getResizeColHtml(0) + '</td><td>' + getResizeColHtml(1) + '<span class="description">' + commitDot + refBranches) + (this.config.referenceLabels.tagLabelsOnRight ? message + refTags : refTags + message) + '</span></td>' +
 				(colVisibility.date ? '<td class="dateCol text" title="' + date.title + '">' + getResizeColHtml(2) + date.formatted + '</td>' : '') +
 				(colVisibility.author ? '<td class="authorCol text" title="' + escapeHtml(commit.author + ' <' + commit.email + '>') + '">' + getResizeColHtml(3) + (this.config.fetchAvatars ? '<span class="avatar" data-email="' + escapeHtml(commit.email) + '">' + (typeof this.avatars[commit.email] === 'string' ? '<img class="avatarImg" src="' + this.avatars[commit.email] + '">' : '') + '</span>' : '') + escapeHtml(commit.author) + '</td>' : '') +
@@ -2112,6 +2224,209 @@ class GitGraphView {
 			runAction({ command: 'rebase', repo: this.currentRepo, obj: obj, actionOn: actionOn, ignoreDate: <boolean>values[1], interactive: interactive, signoff: false }, interactive ? getText('ui.actionLaunchingInteractiveRebase') : getText('ui.rebasingOn', getText(actionOn === GG.RebaseActionOn.Branch ? 'ui.rebaseSubjectBranch' : 'ui.rebaseSubjectCommit') + ' <b><i>' + escapeHtml(name) + '</i></b>'));
 		}, target);
 	}
+
+	public showRebaseTodoEditor(items: ReadonlyArray<GG.RebaseTodoItem>) {
+		if (this.pendingRebaseTodo === null) return;
+		const ctx = this.pendingRebaseTodo;
+
+		if (items.length === 0) {
+			dialog.showError('Nothing to rebase', 'There are no commits in the rebase range.', null, null);
+			this.pendingRebaseTodo = null;
+			return;
+		}
+
+		let html = '<b>Interactive Rebase Todo</b><br><br>';
+		html += '<table class="rebaseTodoEditor"><tbody>';
+		for (let i = 0; i < items.length; i++) {
+			const item = items[i];
+			html += '<tr data-index="' + i + '" data-hash="' + escapeHtml(item.hash) + '" data-action="pick">'
+				+ '<td class="dragHandle" title="Drag to reorder">&#x2630;</td>'
+				+ '<td class="todoHash">' + escapeHtml(item.hash) + '</td>'
+				+ '<td class="todoAction"><select>'
+				+ '<option value="pick" selected>pick</option>'
+				+ '<option value="reword">reword</option>'
+				+ '<option value="edit">edit</option>'
+				+ '<option value="squash">squash</option>'
+				+ '<option value="fixup">fixup</option>'
+				+ '<option value="drop">drop</option>'
+				+ '</select></td>'
+				+ '<td class="todoSubject">' + escapeHtml(item.subject) + '</td>'
+				+ '</tr>';
+		}
+		html += '</tbody></table>';
+
+		const cleanup = () => {
+			this.pendingRebaseTodo = null;
+			if (this.todoDialogDragAbort) {
+				this.todoDialogDragAbort.abort();
+				this.todoDialogDragAbort = null;
+			}
+		};
+
+		dialog.showCustom(html, 'Rebase', () => {
+			const actionBtn = document.getElementById('dialogAction');
+			if (actionBtn && actionBtn.classList.contains('disabled')) return;
+			const rows = document.querySelectorAll('.rebaseTodoEditor tbody tr');
+			const entries: GG.RebaseTodoEntry[] = [];
+			rows.forEach((row) => {
+				const hash = (<HTMLElement>row).dataset.hash!;
+				const action = (<HTMLSelectElement>row.querySelector('.todoAction select')!).value as GG.RebaseTodoAction;
+				entries.push({ hash: hash, action: action });
+			});
+			sendMessage({ command: 'rebaseInteractive', repo: ctx.repo, obj: ctx.obj, actionOn: ctx.actionOn, entries: entries, signoff: ctx.signoff });
+			dialog.close();
+			cleanup();
+		}, 'Cancel', () => {
+			dialog.close();
+		}, cleanup);
+
+		this.setupTodoDragAndDrop();
+		this.setupTodoActionStyling();
+		this.setupTodoDialogDrag();
+	}
+
+	private setupTodoDragAndDrop() {
+		const tbody = document.querySelector('.rebaseTodoEditor tbody');
+		if (tbody === null) return;
+		let dragRow: HTMLElement | null = null;
+
+		const handles = tbody.querySelectorAll('.dragHandle');
+		handles.forEach((handle) => {
+			handle.addEventListener('mousedown', (e: Event) => {
+				const evt = e as MouseEvent;
+				dragRow = (handle as HTMLElement).closest('tr');
+				if (!dragRow) return;
+				dragRow.classList.add('dragging');
+				evt.preventDefault();
+				let lastInsertRef: Node | null = dragRow.nextSibling;
+
+				const onMouseMove = (me: MouseEvent) => {
+					if (!dragRow) return;
+					const rows = Array.from(tbody.querySelectorAll('tr')) as HTMLElement[];
+					let newRef: Node | null = null;
+					for (let i = 0; i < rows.length; i++) {
+						if (rows[i] === dragRow) continue;
+						const rect = rows[i].getBoundingClientRect();
+						if (me.clientY < rect.top + rect.height / 2) {
+							newRef = rows[i];
+							break;
+						}
+					}
+					if (newRef === lastInsertRef) return;
+					if (newRef) {
+						tbody.insertBefore(dragRow, newRef);
+					} else {
+						tbody.appendChild(dragRow);
+					}
+					lastInsertRef = newRef;
+					this.updateTodoGrouping();
+				};
+
+				const onMouseUp = () => {
+					document.removeEventListener('mousemove', onMouseMove);
+					document.removeEventListener('mouseup', onMouseUp);
+					if (dragRow) {
+						dragRow.classList.remove('dragging');
+						dragRow = null;
+					}
+					this.updateTodoGrouping();
+				};
+
+				document.addEventListener('mousemove', onMouseMove);
+				document.addEventListener('mouseup', onMouseUp);
+			});
+		});
+	}
+
+	private setupTodoActionStyling() {
+		const selects = document.querySelectorAll('.rebaseTodoEditor .todoAction select');
+		selects.forEach((select) => {
+			select.addEventListener('change', () => {
+				const row = (select as HTMLElement).closest('tr');
+				if (row) {
+					(<HTMLElement>row).dataset.action = (<HTMLSelectElement>select).value;
+				}
+				this.updateTodoGrouping();
+			});
+		});
+	}
+
+	private updateTodoGrouping() {
+		const rows = document.querySelectorAll('.rebaseTodoEditor tbody tr');
+		let hasError = false;
+		rows.forEach((row) => {
+			row.classList.remove('groupStart', 'groupMember', 'groupLast', 'todoError');
+		});
+		for (let i = 0; i < rows.length; i++) {
+			const action = (<HTMLElement>rows[i]).dataset.action;
+			if (action === 'squash' || action === 'fixup') {
+				// Check if there's a non-squash/fixup row above
+				let hasParent = false;
+				for (let j = i - 1; j >= 0; j--) {
+					const prevAction = (<HTMLElement>rows[j]).dataset.action;
+					if (prevAction !== 'squash' && prevAction !== 'fixup') {
+						hasParent = true;
+						rows[j].classList.add('groupStart');
+						break;
+					}
+				}
+				if (!hasParent) {
+					rows[i].classList.add('todoError');
+					hasError = true;
+				} else {
+					rows[i].classList.add('groupMember');
+				}
+				const nextAction = i + 1 < rows.length ? (<HTMLElement>rows[i + 1]).dataset.action : null;
+				if (nextAction !== 'squash' && nextAction !== 'fixup') {
+					rows[i].classList.add('groupLast');
+				}
+			}
+		}
+		const actionBtn = document.getElementById('dialogAction');
+		if (actionBtn) {
+			if (hasError) {
+				actionBtn.classList.add('disabled');
+				actionBtn.title = 'squash/fixup cannot be the first action — needs a preceding pick/reword/edit';
+			} else {
+				actionBtn.classList.remove('disabled');
+				actionBtn.title = '';
+			}
+		}
+	}
+
+	private setupTodoDialogDrag() {
+		const dialogElem = document.querySelector('.dialog:has(.rebaseTodoEditor)') as HTMLElement;
+		if (dialogElem === null) return;
+		let isDragging = false, offsetX = 0, offsetY = 0;
+		const ac = new AbortController();
+
+		const titleElem = dialogElem.querySelector('.dialogContent > b');
+		if (titleElem === null) return;
+		titleElem.addEventListener('mousedown', (e: Event) => {
+			const me = e as MouseEvent;
+			isDragging = true;
+			const rect = dialogElem.getBoundingClientRect();
+			offsetX = me.clientX - rect.left;
+			offsetY = me.clientY - rect.top;
+			dialogElem.style.transform = 'none';
+			dialogElem.style.left = rect.left + 'px';
+			dialogElem.style.top = rect.top + 'px';
+			me.preventDefault();
+		}, { signal: ac.signal });
+
+		document.addEventListener('mousemove', (e: MouseEvent) => {
+			if (!isDragging) return;
+			dialogElem.style.left = (e.clientX - offsetX) + 'px';
+			dialogElem.style.top = (e.clientY - offsetY) + 'px';
+		}, { signal: ac.signal });
+
+		document.addEventListener('mouseup', () => {
+			isDragging = false;
+		}, { signal: ac.signal });
+
+		this.todoDialogDragAbort = ac;
+	}
+	private todoDialogDragAbort: AbortController | null = null;
 
 
 	/* Table Utils */
@@ -3955,6 +4270,20 @@ window.addEventListener('load', () => {
 					}
 				} else {
 					dialog.showError(getText('ui.unableToRebaseCurrentBranchOn', msg.actionOn), msg.error, null, null);
+				}
+				break;
+			case 'getRebaseTodoList':
+				if (msg.error === null && msg.items !== null) {
+					gitGraph.showRebaseTodoEditor(msg.items);
+				} else {
+					dialog.showError('Unable to get Rebase Todo List', msg.error, null, null);
+				}
+				break;
+			case 'rebaseInteractive':
+				if (msg.error === null) {
+					gitGraph.refresh(false);
+				} else {
+					dialog.showError('Interactive Rebase', msg.error, null, null);
 				}
 				break;
 			case 'refresh':

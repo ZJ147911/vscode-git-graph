@@ -86,6 +86,11 @@ export abstract class BaseGitGraphView extends Disposable {
 					this.respondLoadRepos(event.repos, loadViewTo);
 				}
 			}),
+			// Refresh workspace folder paths when workspace folders change
+			vscode.workspace.onDidChangeWorkspaceFolders(() => {
+				if (!this.isVisible || !this.isGraphViewLoaded) return;
+				this.respondLoadRepos(this.repoManager.getRepos(), null);
+			}),
 			// Refresh the webview when autoScroll configuration changes so it takes effect immediately
 			vscode.workspace.onDidChangeConfiguration((e) => {
 				if (e.affectsConfiguration('git-graph.commitDetailsView.autoScroll')) {
@@ -527,20 +532,19 @@ export abstract class BaseGitGraphView extends Disposable {
 					error: await this.dataSource.rebase(msg.repo, msg.obj, msg.actionOn, msg.ignoreDate, msg.interactive, msg.signoff)
 				});
 				break;
-			case 'getRebaseTodoList':
-				{
-					const result = await this.dataSource.getRebaseTodoList(msg.repo, msg.obj, msg.actionOn);
-					this.sendMessage({
-						command: 'getRebaseTodoList',
-						items: result.items,
-						error: result.error
-					});
-				}
+			case 'getRebaseTodoList': {
+				const todoResult = await this.dataSource.getRebaseTodoList(msg.repo, msg.obj, msg.actionOn);
+				this.sendMessage({
+					command: 'getRebaseTodoList',
+					items: todoResult.items,
+					error: todoResult.error
+				});
 				break;
+			}
 			case 'rebaseInteractive':
 				this.sendMessage({
 					command: 'rebaseInteractive',
-					error: await this.dataSource.rebaseInteractive(msg.repo, msg.obj, msg.actionOn, msg.entries, msg.signoff)
+					error: await this.dataSource.rebaseInteractiveWithTodo(msg.repo, msg.obj, msg.actionOn, msg.entries, msg.signoff)
 				});
 				break;
 			case 'renameBranch':
@@ -756,9 +760,14 @@ export abstract class BaseGitGraphView extends Disposable {
 			</body>`;
 		} else if (numRepos > 0) {
 			const stickyClassAttr = initialState.config.stickyHeader ? ' class="sticky"' : '';
-			let hideRemotes = '', hideSimplify = '';
-			if (!config.toolbarButtonVisibility.remotes) { hideRemotes = 'style="display: none"'; }
-			if (!config.toolbarButtonVisibility.simplify) { hideSimplify = 'style="display: none"'; }
+			let hideRemotes = 'style="display: none"';
+			let hideSimplify = 'style="display: none"';
+			let pathFilterStyle = 'style="display: none"';
+			let optElements = 0;
+			if (numRepos > 1) { optElements++; }
+			if (config.toolbarButtonVisibility.remotes) { optElements++; hideRemotes = ''; }
+			if (config.toolbarButtonVisibility.simplify) { optElements++; hideSimplify = ''; }
+			if (config.toolbarButtonVisibility.pathFilter) { optElements++; pathFilterStyle = `style="flex: 1; max-width: ${30 - 3 * optElements}vw;"`; }
 			body = `<body>
 			<div id="view" tabindex="-1">
 				<div id="controls"${stickyClassAttr}>
@@ -870,6 +879,34 @@ export abstract class BaseGitGraphView extends Disposable {
 		}
 		return workspaceFolderPaths;
 	}
+}
+
+/**
+ * Compute workspace folder relative paths for each repository.
+ * @param repos The set of known repositories.
+ * @returns A mapping from repo path to an array of workspace folder relative paths within that repo.
+ */
+function getWorkspaceFolderRelativePaths(repos: GitRepoSet): { [repo: string]: string[] } {
+	const result: { [repo: string]: string[] } = {};
+	const wsFolders = vscode.workspace.workspaceFolders || [];
+	const wsPaths = wsFolders.map((f) => getPathFromUri(f.uri));
+	const repoPaths = Object.keys(repos);
+	for (let i = 0; i < repoPaths.length; i++) {
+		const repoPath = repoPaths[i];
+		const repoPathWithSlash = pathWithTrailingSlash(repoPath);
+		const paths: string[] = [];
+		for (let j = 0; j < wsPaths.length; j++) {
+			if (wsPaths[j] === repoPath) {
+				// Workspace folder is the repo root — no filtering needed
+				continue;
+			}
+			if (wsPaths[j].startsWith(repoPathWithSlash)) {
+				paths.push(path.posix.relative(repoPath, wsPaths[j]));
+			}
+		}
+		result[repoPath] = paths;
+	}
+	return result;
 }
 
 /**
