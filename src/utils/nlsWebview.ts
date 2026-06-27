@@ -2,60 +2,72 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 
-function readNlsJson(filePath: string): Record<string, string> {
-	return JSON.parse(fs.readFileSync(filePath, 'utf8')) as Record<string, string>;
-}
-
 const bundleCache = new Map<string, Record<string, string>>();
 
-function getFileBundleMap(extensionPath: string, useZh: boolean): Record<string, string> {
-	const cacheKey = extensionPath + (useZh ? ':zh' : ':en');
+function loadBundleFromFile(bundlePath: string): Record<string, string> | null {
+	try {
+		return JSON.parse(fs.readFileSync(bundlePath, 'utf8'));
+	} catch {
+		return null;
+	}
+}
+
+function getLocaleBundle(bundleDir: string, locale: string): Record<string, string> {
+	const cacheKey = `${bundleDir}:${locale}`;
 	const cached = bundleCache.get(cacheKey);
-	if (cached !== undefined) {
-		return cached;
+	if (cached !== undefined) return cached;
+
+	// Try exact locale (e.g., zh-CN), then language-only (e.g., zh), then fallback to default bundle
+	const paths = [
+		path.join(bundleDir, `bundle.l10n.${locale}.json`),
+		path.join(bundleDir, `bundle.l10n.${locale.split('-')[0]}.json`),
+		path.join(bundleDir, 'bundle.l10n.json'),
+	];
+
+	let result: Record<string, string> = {};
+	for (const p of paths) {
+		const loaded = loadBundleFromFile(p);
+		if (loaded !== null) {
+			result = loaded;
+			break;
+		}
 	}
-	const base = readNlsJson(path.join(extensionPath, 'package.nls.json'));
-	let result: Record<string, string>;
-	if (useZh) {
-		const zhBundlePath = path.join(extensionPath, 'package.nls.zh.json');
-		result = fs.existsSync(zhBundlePath) ? { ...base, ...readNlsJson(zhBundlePath) } : base;
-	} else {
-		result = base;
-	}
+
 	bundleCache.set(cacheKey, result);
 	return result;
 }
 
-function createMapTranslator(extensionPath: string, useZh: boolean): (key: string) => string {
-	const map = getFileBundleMap(extensionPath, useZh);
-	return (key: string) => map[key] ?? key;
-}
-
 /**
  * Resolve strings shown in the Git Graph webview.
- * - `git-graph.language` **zh** / **en**: read `package.nls*.json` from disk (explicit override).
- * - **empty** (default): use `vscode.l10n.t`, same as the rest of the extension and the active VS Code / Language Pack locale.
+ *
+ * - Default (empty): uses `vscode.l10n.t()`, which automatically loads
+ *   translations from `l10n/bundle.l10n.json` based on the active VS Code UI
+ *   language — same as the rest of the extension.
+ * - `git-graph.language` set to **zh** or **en**: overrides the webview
+ *   language. If VS Code's UI language already matches the override, falls
+ *   back to `vscode.l10n.t()`. Otherwise, reads the corresponding
+ *   `l10n/bundle.l10n.xx.json` file directly.
  */
 export function createWebviewNlsTranslator(
 	extensionPath: string,
 	gitGraphLanguageSetting: string
 ): (key: string) => string {
 	const norm = gitGraphLanguageSetting.trim().toLowerCase();
-	if (norm === 'zh') {
-		return createMapTranslator(extensionPath, true);
+	const bundleDir = path.join(extensionPath, 'l10n');
+	const currentLang = vscode.env.language.toLowerCase();
+
+	// Explicitly force English when VS Code is not in English
+	if (norm === 'en' && !currentLang.startsWith('en')) {
+		const bundle = getLocaleBundle(bundleDir, 'en');
+		return (key: string) => bundle[key] ?? key;
 	}
-	if (norm === 'en') {
-		return createMapTranslator(extensionPath, false);
+
+	// Explicitly force Chinese when VS Code is not in Chinese
+	if (norm === 'zh' && !currentLang.startsWith('zh')) {
+		const bundle = getLocaleBundle(bundleDir, 'zh');
+		return (key: string) => bundle[key] ?? key;
 	}
-	return (key: string) => {
-		// Check if VS Code language is Chinese (zh, zh-CN, zh-TW, etc.)
-		const useZh = vscode.env.language.toLowerCase().startsWith('zh');
-		const translated = getFileBundleMap(extensionPath, useZh)[key];
-		if (translated !== undefined) {
-			return translated;
-		}
-		// Fallback: try vscode.l10n.t
-		const fromL10n = vscode.l10n.t(key);
-		return fromL10n !== key ? fromL10n : key;
-	};
+
+	// Default: use VS Code's built-in l10n system
+	return (key: string) => vscode.l10n.t(key);
 }
