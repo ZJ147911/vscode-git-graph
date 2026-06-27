@@ -357,8 +357,6 @@
 	"configuration.viewLocation.enumDescription.both": "允许两种显示模式（使用特定命令在每个位置打开）",
 	"configuration.viewLocation.enumDescription.editor": "在编辑器区域显示 Git Graph（传统视图）",
 	"configuration.viewLocation.enumDescription.panel": "在面板区域显示 Git Graph（底部/侧边面板）",
-	"extension.name": "Git Graph",
-	"extension.description": "查看存储库的 Git 图形",
 	"git.fileChangeTypes.added": "新增",
 	"git.fileChangeTypes.deleted": "删除",
 	"git.fileChangeTypes.modified": "修改",

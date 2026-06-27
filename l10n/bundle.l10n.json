@@ -357,8 +357,6 @@
 	"configuration.viewLocation.enumDescription.both": "Allow both display modes (use specific commands to open in each location)",
 	"configuration.viewLocation.enumDescription.editor": "Display Git Graph in the editor area (traditional view)",
 	"configuration.viewLocation.enumDescription.panel": "Display Git Graph in the panel area (bottom/side panel)",
-	"extension.name": "Git Graph",
-	"extension.description": "View a Git Graph of your repository",
 	"git.fileChangeTypes.added": "Added",
 	"git.fileChangeTypes.deleted": "Deleted",
 	"git.fileChangeTypes.modified": "Modified",

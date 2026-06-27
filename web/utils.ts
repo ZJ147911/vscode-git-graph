@@ -51,7 +51,7 @@ const SVG_ICONS = {
 
 
 // Translated texts
-// Injected by the extension via setI18nTexts() from l10n/bundle.l10n.json.
+// The full default values are injected at build time by package-web.js from package.nls.json (media/i18n-defaults.js).
 // Only a minimal fallback is kept here for debugging in unpackaged environments.
 const DEFAULT_I18N_TEXTS: Record<string, string> = {
 	'ui.error': 'Error',
