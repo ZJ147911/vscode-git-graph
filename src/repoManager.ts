@@ -211,7 +211,7 @@ export class RepoManager extends Disposable {
 	 * @returns TRUE => Repository was registered, FALSE => Repository was already known.
 	 */
 	public async registerRepoByRoot(root: string) {
-		if (typeof this.repos[root] !== 'undefined') {
+		if (this.isKnownRepo(root)) {
 			return false;
 		}
 		await this.addRepo(root);
@@ -260,8 +260,10 @@ export class RepoManager extends Disposable {
 	 */
 	public getRepoContainingFile(path: string) {
 		let repoPaths = Object.keys(this.repos), repo = null;
+		const comparePath = process.platform === 'win32' ? path.toLowerCase() : path;
 		for (let i = 0; i < repoPaths.length; i++) {
-			if (path.startsWith(pathWithTrailingSlash(repoPaths[i])) && (repo === null || repo.length < repoPaths[i].length)) repo = repoPaths[i];
+			const compareRepoPath = process.platform === 'win32' ? pathWithTrailingSlash(repoPaths[i]).toLowerCase() : pathWithTrailingSlash(repoPaths[i]);
+			if (comparePath.startsWith(compareRepoPath) && (repo === null || repo.length < repoPaths[i].length)) repo = repoPaths[i];
 		}
 		return repo;
 	}
@@ -309,7 +311,27 @@ export class RepoManager extends Disposable {
 	 * @returns TRUE => Known repository, FALSE => Unknown repository.
 	 */
 	public isKnownRepo(repo: string) {
-		return typeof this.repos[repo] !== 'undefined';
+		if (typeof this.repos[repo] !== 'undefined') return true;
+		if (process.platform === 'win32') {
+			const repoLower = repo.toLowerCase();
+			return Object.keys(this.repos).some(r => r.toLowerCase() === repoLower);
+		}
+		return false;
+	}
+
+	/**
+	 * Get the known repository path matching the specified path, normalising case differences on Windows.
+	 * @param repo The path to look up.
+	 * @returns The stored repository path, or NULL if the specified repository is unknown.
+	 */
+	public getRepoPath(repo: string) {
+		if (typeof this.repos[repo] !== 'undefined') return repo;
+		if (process.platform === 'win32') {
+			const repoLower = repo.toLowerCase();
+			const key = Object.keys(this.repos).find(r => r.toLowerCase() === repoLower);
+			if (key !== undefined) return key;
+		}
+		return null;
 	}
 
 	/**

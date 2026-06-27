@@ -259,6 +259,7 @@ class GitGraphView {
 		} else {
 			this.restorePathFilterState(this.currentRepo);
 			if (this.loadViewTo !== null && this.loadViewTo.pathFilter !== undefined) {
+				this.currentPathFilter = this.gitRepos[this.currentRepo].pathFilter;
 				this.maxCommits = this.config.initialLoadCommits;
 				this.refresh(true);
 			} else {

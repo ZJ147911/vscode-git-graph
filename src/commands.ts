@@ -434,8 +434,9 @@ export class CommandManager extends Disposable {
 			}
 		}
 
-		const relativePath = absPath === repo! ? '' : absPath.substring(repo!.length + 1);
-		const loadViewTo = { repo: repo!, pathFilter: relativePath };
+		const repoPath = this.repoManager.getRepoPath(repo!) || repo!;
+		const relativePath = absPath === repoPath ? '' : absPath.substring(repoPath.length + 1);
+		const loadViewTo = { repo: repoPath, pathFilter: relativePath };
 
 		const config = getConfig();
 		if (config.viewLocation === 'panel') {
