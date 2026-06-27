@@ -1,4 +1,6 @@
 import * as os from 'os';
+import * as path from 'path';
+import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { AvatarManager } from './avatarManager';
 import { getConfig } from './config';
@@ -408,14 +410,32 @@ export class CommandManager extends Disposable {
 		}
 
 		const absPath = getPathFromUri(arg);
-		const repo = this.repoManager.getRepoContainingFile(absPath);
+
+		let repo = this.repoManager.getRepoContainingFile(absPath);
+		if (repo === null && this.repoManager.isKnownRepo(absPath)) {
+			repo = absPath;
+		}
 		if (repo === null) {
-			showErrorMessage('The selected path is not within a known Git repository.');
-			return;
+			// Walk up the directory tree looking for .git, silently register without triggering sendRepos
+			let current = absPath;
+			let found = false;
+			while (current !== path.posix.dirname(current)) {
+				if (fs.existsSync(path.join(current, '.git'))) {
+					await this.repoManager.registerRepoByRoot(current);
+					repo = current;
+					found = true;
+					break;
+				}
+				current = path.posix.dirname(current);
+			}
+			if (!found) {
+				showErrorMessage(vscode.l10n.t('ui.pathNotInKnownRepo'));
+				return;
+			}
 		}
 
-		const relativePath = absPath.startsWith(repo + '/') ? absPath.substring(repo.length + 1) : absPath.substring(repo.length);
-		const loadViewTo = { repo: repo, pathFilter: relativePath };
+		const relativePath = absPath === repo! ? '' : absPath.substring(repo!.length + 1);
+		const loadViewTo = { repo: repo!, pathFilter: relativePath };
 
 		const config = getConfig();
 		if (config.viewLocation === 'panel') {
@@ -427,7 +447,10 @@ export class CommandManager extends Disposable {
 				this.repoManager,
 				this.logger
 			);
-			panelProvider.show(loadViewTo);
+			// Send data once via updateWithRepos (message if visible, stored for later if not)
+			panelProvider.updateWithRepos(this.repoManager.getRepos(), loadViewTo);
+			// Reveal: if visibility changes, update() regenerates HTML with this.loadViewTo + updated repos
+			await panelProvider.reveal();
 		} else {
 			GitGraphView.createOrShow(this.context.extensionPath, this.dataSource, this.extensionState, this.avatarManager, this.repoManager, this.logger, loadViewTo);
 		}

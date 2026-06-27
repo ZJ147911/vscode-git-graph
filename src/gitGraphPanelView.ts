@@ -127,12 +127,12 @@ export class GitGraphPanelView extends BaseGitGraphView implements vscode.Webvie
 	 * Show the panel view.
 	 */
 	public async show(loadViewTo: LoadGitGraphViewTo) {
+		this.loadViewTo = loadViewTo;
+
 		if (!this._view) {
-			// If view is not yet created, try to reveal it which will trigger resolveWebviewView
 			try {
 				await vscode.commands.executeCommand('git-graph.panel.focus');
 			} catch {
-				// Try alternative commands to show the panel
 				try {
 					await vscode.commands.executeCommand('workbench.view.extension.git-graph-panel');
 				} catch {
@@ -144,9 +144,27 @@ export class GitGraphPanelView extends BaseGitGraphView implements vscode.Webvie
 		if (this._view) {
 			this._view.show?.(true);
 			this.updateWithRepos(this.repoManager.getRepos(), loadViewTo);
-		} else {
-			// Save the loadViewTo for when the view is resolved
-			this.loadViewTo = loadViewTo;
+		}
+	}
+
+	/**
+	 * Reveal the panel view without sending any data.
+	 * Use after updateWithRepos() to avoid duplicate messages.
+	 */
+	public async reveal() {
+		if (!this._view) {
+			try {
+				await vscode.commands.executeCommand('git-graph.panel.focus');
+			} catch {
+				try {
+					await vscode.commands.executeCommand('workbench.view.extension.git-graph-panel');
+				} catch {
+					this.logger.logError('Failed to reveal Git Graph panel');
+				}
+			}
+		}
+		if (this._view) {
+			this._view.show?.(true);
 		}
 	}
 }

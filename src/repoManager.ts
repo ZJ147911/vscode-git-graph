@@ -205,6 +205,20 @@ export class RepoManager extends Disposable {
 	}
 
 	/**
+	 * Register a repository with Git Graph using a pre-verified root path.
+	 * This bypasses `git rev-parse --show-toplevel` for paths where `.git` has already been confirmed.
+	 * @param root The verified root path of the repository.
+	 * @returns TRUE => Repository was registered, FALSE => Repository was already known.
+	 */
+	public async registerRepoByRoot(root: string) {
+		if (typeof this.repos[root] !== 'undefined') {
+			return false;
+		}
+		await this.addRepo(root);
+		return true;
+	}
+
+	/**
 	 * Ignore a repository known to Git Graph. Unlike `removeRepo`, ignoring the repository will prevent it from being automatically detected and re-added the next time Visual Studio Code is started.
 	 * @param repo The path of the repository.
 	 * @returns TRUE => Repository was ignored, FALSE => Repository is not know to Git Graph.

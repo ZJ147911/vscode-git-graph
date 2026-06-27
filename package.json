@@ -30,9 +30,10 @@
 	"license": "SEE LICENSE IN 'LICENSE'",
 	"icon": "resources/icon.png",
 	"engines": {
-		"vscode": "^1.68.0",
+		"vscode": "^1.74.0",
 		"node": ">=18.18.0"
 	},
+	"l10n": "./l10n",
 	"extensionKind": [
 		"workspace"
 	],
@@ -1685,7 +1686,7 @@
 		"@types/jest": "^29.5.0",
 		"@types/node": "^22.0.0",
 		"@types/prettier": "<2.6.0",
-		"@types/vscode": "^1.68.0",
+		"@types/vscode": "^1.74.0",
 		"@typescript-eslint/eslint-plugin": "^8.20.0",
 		"@typescript-eslint/parser": "^8.20.0",
 		"@vscode/vsce": "^3.6.0",

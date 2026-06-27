@@ -341,18 +341,6 @@ class Dialog {
 		this.customOnClose = onClose;
 	}
 
-	/**
-	 * Show a dialog in the Git Graph View.
-	 * @param type The type of dialog being shown.
-	 * @param html The HTML content for the dialog.
-	 * @param actionName The name of the primary (default) action.
-	 * Show a custom dialog with full control over content and callbacks, including a close callback.
-	 */
-	public showCustom(html: string, actionName: string, actioned: () => void, secondaryActionName: string, secondaryActioned: () => void, onClose: (() => void) | null) {
-		this.show(DialogType.Form, html, actionName, secondaryActionName, actioned, secondaryActioned, null);
-		this.onCloseCallback = onClose;
-	}
-
 	private show(type: DialogType, html: string, actionName: string | null, secondaryActionName: string, actioned: (() => void) | null, secondaryActioned: (() => void) | null, target: DialogTarget | null) {
 		closeDialogAndContextMenu();
 

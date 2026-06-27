@@ -225,7 +225,6 @@ export interface GitRepoState {
 	pathFilter: string | null;
 	workspaceFolderIndex: number | null;
 	isCdvSummaryHidden: boolean;
-	pathFilter: string | null;
 }
 
 export const PATH_FILTER_WS_ALL = 'workspace_all';
@@ -1190,46 +1189,6 @@ export interface ResponseGetRebaseTodoList extends BaseMessage {
 	readonly items: ReadonlyArray<RebaseTodoItem> | null;
 	readonly error: ErrorInfo;
 }
-export interface RequestRebaseInteractive extends RepoRequest {
-	readonly command: 'rebaseInteractive';
-	readonly obj: string;
-	readonly actionOn: RebaseActionOn;
-	readonly entries: ReadonlyArray<RebaseTodoEntry>;
-	readonly signoff: boolean;
-}
-export interface ResponseRebaseInteractive extends ResponseWithErrorInfo {
-	readonly command: 'rebaseInteractive';
-}
-
-export const enum RebaseTodoAction {
-	Pick = 'pick',
-	Reword = 'reword',
-	Edit = 'edit',
-	Squash = 'squash',
-	Fixup = 'fixup',
-	Drop = 'drop'
-}
-
-export interface RebaseTodoItem {
-	readonly hash: string;
-	readonly subject: string;
-}
-
-export interface RebaseTodoEntry {
-	readonly hash: string;
-	readonly action: RebaseTodoAction;
-}
-
-export interface RequestGetRebaseTodoList extends RepoRequest {
-	readonly command: 'getRebaseTodoList';
-	readonly obj: string;
-	readonly actionOn: RebaseActionOn;
-}
-export interface ResponseGetRebaseTodoList extends ResponseWithErrorInfo {
-	readonly command: 'getRebaseTodoList';
-	readonly items: RebaseTodoItem[] | null;
-}
-
 export interface RequestRebaseInteractive extends RepoRequest {
 	readonly command: 'rebaseInteractive';
 	readonly obj: string;

@@ -762,19 +762,20 @@ export abstract class BaseGitGraphView extends Disposable {
 			const stickyClassAttr = initialState.config.stickyHeader ? ' class="sticky"' : '';
 			let hideRemotes = 'style="display: none"';
 			let hideSimplify = 'style="display: none"';
-			let pathFilterStyle = 'style="display: none"';
 			let optElements = 0;
 			if (numRepos > 1) { optElements++; }
 			if (config.toolbarButtonVisibility.remotes) { optElements++; hideRemotes = ''; }
 			if (config.toolbarButtonVisibility.simplify) { optElements++; hideSimplify = ''; }
-			if (config.toolbarButtonVisibility.pathFilter) { optElements++; pathFilterStyle = `style="flex: 1; max-width: ${30 - 3 * optElements}vw;"`; }
+			let pathFilterStyle = 'style="display: none"';
+			if (config.toolbarButtonVisibility.pathFilter) { optElements++; pathFilterStyle = 'style="flex: 1;"'; }
 			body = `<body>
 			<div id="view" tabindex="-1">
 				<div id="controls"${stickyClassAttr}>
-					<span id="repoControl"><span class="unselectable">${wt('ui.repo')}: </span><div id="repoDropdown" class="dropdown"></div></span>
-					<span id="branchControl"><span class="unselectable">${wt('ui.branches')}: </span><div id="branchDropdown" class="dropdown"></div></span>
-					<span id="pathFilterControl" title="${wt('ui.selectPathByContextMenu')}"><span class="unselectable">${wt('ui.paths')}: </span><div id="pathFilterDropdown" class="dropdown"></div></span>
-					<span id="authorControl"><span class="unselectable">${wt('ui.authors')}: </span><div id="authorDropdown" class="dropdown"></div></span>
+					<div id="filterControls" style="display: flex; flex-wrap: wrap; justify-content: center">
+					<span id="repoControl" style="flex: 1;"><span class="unselectable">${wt('ui.repo')}: </span><div id="repoDropdown" class="dropdown"></div></span>
+					<span id="branchControl" style="flex: 2;"><span class="unselectable">${wt('ui.branches')}: </span><div id="branchDropdown" class="dropdown"></div></span>
+					<span id="pathFilterControl" ${pathFilterStyle} title="${wt('ui.selectPathByContextMenu')}"><span class="unselectable">${wt('ui.paths')}: </span><div id="pathFilterDropdown" class="dropdown"></div></span>
+					<span id="authorControl" style="flex: 1;"><span class="unselectable">${wt('ui.authors')}: </span><div id="authorDropdown" class="dropdown"></div></span>
 					<label ${hideRemotes} id="showRemoteBranchesControl" title="${wt('ui.showRemoteBranches')}"><input type="checkbox" id="showRemoteBranchesCheckbox" tabindex="-1"><span class="customCheckbox"></span>${wt('ui.remotes')}</label>
 					<label ${hideSimplify} id="simplifyByDecorationControl" title="${wt('ui.simplifyByDecoration')}"><input type="checkbox" id="simplifyByDecorationCheckbox" tabindex="-1"><span class="customCheckbox"></span>${wt('ui.simplify')}</label>
 					<div id="currentBtn" title="${wt('ui.current')}"></div>
@@ -783,6 +784,7 @@ export abstract class BaseGitGraphView extends Disposable {
 					<div id="settingsBtn" title="${wt('ui.repositorySettings')}"></div>
 					<div id="fetchBtn"></div>
 					<div id="refreshBtn"></div>
+					</div>
 				</div>
 				<div id="content">
 					<div id="commitGraph"></div>
@@ -879,34 +881,6 @@ export abstract class BaseGitGraphView extends Disposable {
 		}
 		return workspaceFolderPaths;
 	}
-}
-
-/**
- * Compute workspace folder relative paths for each repository.
- * @param repos The set of known repositories.
- * @returns A mapping from repo path to an array of workspace folder relative paths within that repo.
- */
-function getWorkspaceFolderRelativePaths(repos: GitRepoSet): { [repo: string]: string[] } {
-	const result: { [repo: string]: string[] } = {};
-	const wsFolders = vscode.workspace.workspaceFolders || [];
-	const wsPaths = wsFolders.map((f) => getPathFromUri(f.uri));
-	const repoPaths = Object.keys(repos);
-	for (let i = 0; i < repoPaths.length; i++) {
-		const repoPath = repoPaths[i];
-		const repoPathWithSlash = pathWithTrailingSlash(repoPath);
-		const paths: string[] = [];
-		for (let j = 0; j < wsPaths.length; j++) {
-			if (wsPaths[j] === repoPath) {
-				// Workspace folder is the repo root — no filtering needed
-				continue;
-			}
-			if (wsPaths[j].startsWith(repoPathWithSlash)) {
-				paths.push(path.posix.relative(repoPath, wsPaths[j]));
-			}
-		}
-		result[repoPath] = paths;
-	}
-	return result;
 }
 
 /**

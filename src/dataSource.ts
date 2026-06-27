@@ -314,8 +314,8 @@ export class DataSource extends Disposable {
 				}
 			}
 
-			const pathFilterActive = pathFilter !== null && pathFilter !== PATH_FILTER_WS_ALL;
-			if (pathFilterActive || pathFilter === PATH_FILTER_WS_ALL) {
+			const pathFilterWsActive = pathFilter !== null && pathFilter !== PATH_FILTER_WS_ALL;
+			if (pathFilterWsActive || pathFilter === PATH_FILTER_WS_ALL) {
 				const paths = pathFilter === PATH_FILTER_WS_ALL ? [] : pathFilter.split(',').map((p) => p.trim()).filter((p) => p !== '');
 				for (i = commitNodes.length - 1; i >= 0; i--) {
 					const matches = await this.commitMatchesPathFilter(repo, commitNodes[i].hash, paths);
@@ -375,7 +375,6 @@ export class DataSource extends Disposable {
 						node.remotes.push(...refs.remotes);
 					}
 				}
-			}
 			}
 
 			return {
@@ -1225,28 +1224,6 @@ export class DataSource extends Disposable {
 		return this.spawnGit(args, repo, (stdout) => {
 			return stdout.trim() !== '';
 		}).then((result) => result, () => true);
-	}
-
-	/**
-	 * Get the list of rebase todo items for interactive rebase.
-	 * @param repo The path of the repository.
-	 * @param obj The object the current branch will be rebased onto.
-	 * @param actionOn Is the rebase on a branch or commit.
-	 * @returns The rebase todo list, or an error message.
-	 */
-	public getRebaseTodoList(repo: string, obj: string, actionOn: RebaseActionOn): Promise<{ items: { hash: string, subject: string }[] | null, error: ErrorInfo }> {
-		const target = actionOn === RebaseActionOn.Branch ? obj : obj + '^..HEAD';
-		return this.spawnGit(['-c', 'log.showSignature=false', 'log', '--format=%H%x00%s', target, '--'], repo, (stdout) => {
-			const items: { hash: string, subject: string }[] = [];
-			const lines = stdout.split(EOL_REGEX);
-			for (let i = 0; i < lines.length - 1; i++) {
-				const parts = lines[i].split('\0');
-				if (parts.length === 2) {
-					items.push({ hash: parts[0], subject: parts[1] });
-				}
-			}
-			return items.reverse();
-		}).then((items) => ({ items: items, error: null }), (error) => ({ items: null, error: error }));
 	}
 
 	/**

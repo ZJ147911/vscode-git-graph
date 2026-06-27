@@ -58,7 +58,6 @@ class GitGraphView {
 	private readonly branchDropdown: Dropdown;
 	private readonly pathFilterDropdown: Dropdown;
 	private readonly authorDropdown: Dropdown;
-	private readonly pathFilterDropdown: Dropdown;
 
 	private readonly viewElem: HTMLElement;
 	private readonly controlsElem: HTMLElement;
@@ -67,7 +66,6 @@ class GitGraphView {
 	private readonly footerElem: HTMLElement;
 	private readonly showRemoteBranchesElem: HTMLInputElement;
 	private readonly simplifyByDecorationElem: HTMLInputElement;
-	private workspaceFolderPaths: { readonly [repo: string]: readonly string[] };
 	private readonly refreshBtnElem: HTMLElement;
 
 	constructor(viewElem: HTMLElement, prevState: WebViewState | null) {
@@ -114,14 +112,6 @@ class GitGraphView {
 			this.clearCommits();
 			this.requestLoadRepoInfoAndCommits(true, true);
 		}, this.config.singleAuthorSelect);
-		this.pathFilterDropdown = new Dropdown('pathFilterDropdown', true, false, getText('ui.paths'), (values) => {
-			this.currentPathFilter = values[0] || null;
-			this.maxCommits = this.config.initialLoadCommits;
-			this.saveRepoStateValue(this.currentRepo, 'pathFilter', this.currentPathFilter);
-			this.saveState();
-			this.clearCommits();
-			this.requestLoadRepoInfoAndCommits(true, true);
-		});
 		this.showRemoteBranchesElem = <HTMLInputElement>document.getElementById('showRemoteBranchesCheckbox')!;
 		this.showRemoteBranchesElem.addEventListener('change', () => {
 			this.saveRepoStateValue(this.currentRepo, 'showRemoteBranchesV2', this.showRemoteBranchesElem.checked ? GG.BooleanOverride.Enabled : GG.BooleanOverride.Disabled);
@@ -134,7 +124,7 @@ class GitGraphView {
 		});
 
 		this.workspaceFolderPaths = initialState.workspaceFolderPaths;
-		this.pathFilterDropdown = new Dropdown('pathFilterDropdown', false, false, 'Paths', (values) => {
+		this.pathFilterDropdown = new Dropdown('pathFilterDropdown', false, false, getText('ui.paths'), (values) => {
 			this.handlePathFilterChange(values[0]);
 		}, false, (value) => {
 			this.saveRepoStateValue(this.currentRepo, 'pathFilter', value);
@@ -226,17 +216,7 @@ class GitGraphView {
 		this.workspaceFolderPaths = workspaceFolderPaths;
 	}
 
-	private renderPathFilterOptions() {
-		const PATH_FILTER_WS_ALL = 'workspace_all';
-		const options: { name: string, value: string }[] = [{ name: getText('ui.all'), value: '' }];
-		const paths = this.workspaceFolderPaths[this.currentRepo];
-		if (paths && paths.length > 0) {
-			options.push({ name: getText('ui.workspace'), value: PATH_FILTER_WS_ALL });
-		}
-		this.pathFilterDropdown.setOptions(options, [this.currentPathFilter || '']);
-	}
-
-	public loadRepos(repos: GG.GitRepoSet, lastActiveRepo: string | null, loadViewTo: GG.LoadGitGraphViewTo) {
+	public loadRepos(repos: GG.GitRepoSet, lastActiveRepo: string | null, loadViewTo: GG.LoadGitGraphViewTo, workspaceFolderPaths?: { readonly [repo: string]: readonly string[] }) {
 		this.gitRepos = repos;
 		if (workspaceFolderPaths) {
 			this.workspaceFolderPaths = workspaceFolderPaths;
@@ -348,10 +328,10 @@ class GitGraphView {
 	}
 
 	private getPathFilterOptions(): DropdownOption[] {
-		const options: DropdownOption[] = [{ name: 'All', value: SHOW_ALL_BRANCHES }];
+		const options: DropdownOption[] = [{ name: getText('ui.all'), value: SHOW_ALL_BRANCHES }];
 		const wsPaths = this.workspaceFolderPaths[this.currentRepo] || [];
 		if (wsPaths.length > 1) {
-			options.push({ name: 'Workspace (all)', value: PATH_FILTER_WS_ALL });
+			options.push({ name: getText('ui.workspace'), value: PATH_FILTER_WS_ALL });
 		}
 		for (const p of wsPaths) {
 			options.push({ name: p, value: p });
@@ -375,11 +355,6 @@ class GitGraphView {
 		this.maxCommits = this.config.initialLoadCommits;
 		this.updateSimplifyState();
 		this.refresh(true);
-	}
-
-	private getWorkspacePathsForCurrentRepo(): string | null {
-		const paths = this.workspaceFolderPaths[this.currentRepo] || [];
-		return paths.length > 0 ? paths.join(', ') : null;
 	}
 
 	private loadRepoInfo(branchOptions: ReadonlyArray<string>, branchHead: string | null, remotes: ReadonlyArray<string>, stashes: ReadonlyArray<GG.GitStash>, isRepo: boolean) {
@@ -439,7 +414,7 @@ class GitGraphView {
 		// Set up branch dropdown options
 		this.branchDropdown.setOptions(this.getBranchOptions(true), this.currentBranches);
 		this.authorDropdown.setOptions(this.getAuthorOptions(), this.currentAuthors);
-		this.renderPathFilterOptions();
+		this.restorePathFilterState(this.currentRepo);
 
 		// Remove hidden remotes that no longer exist
 		let hiddenRemotes = this.gitRepos[this.currentRepo].hideRemotes;
