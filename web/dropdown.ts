@@ -18,6 +18,7 @@ class Dropdown {
 	private optionsSelected: boolean[] = [];
 	private lastSelected: number = 0; // Only used when multipleAllowed === false
 	private dropdownVisible: boolean = false;
+	private focussedOption: number = -1;
 	private lastClicked: number = 0;
 	private doubleClickTimeout: NodeJS.Timeout | null = null;
 
@@ -49,6 +50,7 @@ class Dropdown {
 
 		this.menuElem = document.createElement('div');
 		this.menuElem.className = 'dropdownMenu';
+		this.menuElem.setAttribute('role', 'listbox');
 
 		let filter = this.menuElem.appendChild(document.createElement('div'));
 		filter.className = 'dropdownFilter';
@@ -66,25 +68,28 @@ class Dropdown {
 
 		this.currentValueElem = this.elem.appendChild(document.createElement('div'));
 		this.currentValueElem.className = 'dropdownCurrentValue';
+		this.currentValueElem.tabIndex = 0;
+		this.currentValueElem.setAttribute('role', 'button');
+		this.currentValueElem.setAttribute('aria-haspopup', 'listbox');
+		this.currentValueElem.setAttribute('aria-expanded', 'false');
 
 		alterClass(this.elem, 'multi', multipleAllowed && !selectMultipleWithCtrl);
 		this.elem.appendChild(this.menuElem);
 
 		document.addEventListener('click', (e) => {
 			if (!e.target) return;
-			if (e.target === this.currentValueElem) {
-				this.dropdownVisible = !this.dropdownVisible;
+			const target = <HTMLElement>e.target;
+			if (target === this.currentValueElem || target.closest('.dropdownCurrentValue') === this.currentValueElem) {
 				if (this.dropdownVisible) {
-					this.filterInput.value = '';
-					this.filter();
-				}
-				this.elem.classList.toggle('dropdownOpen');
-				if (this.dropdownVisible) this.filterInput.focus();
-			} else if (this.dropdownVisible) {
-				if ((<HTMLElement>e.target).closest('.dropdown') !== this.elem) {
 					this.close();
 				} else {
-					const option = <HTMLElement | null>(<HTMLElement>e.target).closest('.dropdownOption');
+					this.open();
+				}
+			} else if (this.dropdownVisible) {
+				if (target.closest('.dropdown') !== this.elem) {
+					this.close();
+				} else {
+					const option = <HTMLElement | null>target.closest('.dropdownOption');
 					if (option !== null && option.parentNode === this.optionsElem && typeof option.dataset.id !== 'undefined') {
 						this.onOptionClick(parseInt(option.dataset.id!), e);
 					}
@@ -92,13 +97,49 @@ class Dropdown {
 			}
 		}, true);
 		document.addEventListener('contextmenu', () => this.close(), true);
-		this.filterInput.addEventListener('keyup', () => this.filter());
+		this.optionsElem.addEventListener('mousemove', (e) => {
+			if (!e.target) return;
+			const option = <HTMLElement | null>(<HTMLElement>e.target).closest('.dropdownOption');
+			if (option !== null && option.parentNode === this.optionsElem && typeof option.dataset.id !== 'undefined') {
+				this.setFocussedOption(parseInt(option.dataset.id!), false);
+			}
+		});
+		this.currentValueElem.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+				this.open();
+				handledEvent(e);
+			} else if (e.key === 'Escape' && this.dropdownVisible) {
+				this.close();
+				handledEvent(e);
+			}
+		});
+		this.filterInput.addEventListener('input', () => this.filter());
 		this.filterInput.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter' && this.filterSubmitCallback !== null) {
+			if (e.key === 'ArrowDown') {
+				this.moveFocus(1);
+				handledEvent(e);
+			} else if (e.key === 'ArrowUp') {
+				this.moveFocus(-1);
+				handledEvent(e);
+			} else if (e.key === 'Home') {
+				this.focusEdgeOption(1);
+				handledEvent(e);
+			} else if (e.key === 'End') {
+				this.focusEdgeOption(-1);
+				handledEvent(e);
+			} else if (e.key === 'Escape') {
+				this.close();
+				this.currentValueElem.focus();
+				handledEvent(e);
+			} else if (e.key === 'Enter') {
 				const value = this.filterInput.value.trim();
-				if (value !== '') {
+				if (this.filterSubmitCallback !== null && value !== '' && !this.hasExactVisibleOption(value)) {
 					this.close();
 					this.filterSubmitCallback(value);
+					handledEvent(e);
+				} else if (this.focussedOption > -1 && this.isOptionVisible(this.focussedOption)) {
+					this.onOptionClick(this.focussedOption, e);
+					handledEvent(e);
 				}
 			}
 		});
@@ -166,7 +207,7 @@ class Dropdown {
 	 */
 	public selectOption(value: string, event: MouseEvent | undefined) {
 		const optionIndex = this.options.findIndex((option) => value === option.value);
-		if (optionIndex < 0 && (this.optionsSelected[0] || this.optionsSelected[optionIndex])) return;
+		if (optionIndex < 0 || (!this.optionsSelected[0] && this.optionsSelected[optionIndex])) return;
 		if (this.multipleAllowed && !this.optionsSelected[0] && (!this.selectMultipleWithCtrl || (event && (event.ctrlKey || event.metaKey)))) {
 			// Select the option with the specified value
 			this.optionsSelected[optionIndex] = true;
@@ -191,7 +232,7 @@ class Dropdown {
 	 */
 	public unselectOption(value: string) {
 		const optionIndex = this.options.findIndex((option) => value === option.value);
-		if (optionIndex < 0 && (this.optionsSelected[0] || this.optionsSelected[optionIndex])) return;
+		if (optionIndex < 0 || (!this.optionsSelected[0] && !this.optionsSelected[optionIndex])) return;
 		if (this.multipleAllowed) {
 			if (this.optionsSelected[0]) {
 				// Show All is currently selected, so unselect it, and select all branch options
@@ -238,8 +279,22 @@ class Dropdown {
 	 */
 	public close() {
 		this.elem.classList.remove('dropdownOpen');
+		this.currentValueElem.setAttribute('aria-expanded', 'false');
 		this.dropdownVisible = false;
+		this.setFocussedOption(-1, false);
 		this.clearDoubleClickTimeout();
+	}
+
+	/**
+	 * Open the dropdown.
+	 */
+	private open() {
+		this.dropdownVisible = true;
+		this.elem.classList.add('dropdownOpen');
+		this.currentValueElem.setAttribute('aria-expanded', 'true');
+		this.filterInput.value = '';
+		this.filter(true);
+		this.filterInput.focus();
 	}
 
 	/**
@@ -255,8 +310,9 @@ class Dropdown {
 		let html = '';
 		for (let i = 0; i < this.options.length; i++) {
 			const escapedName = escapeHtml(this.options[i].name);
-			html += '<div class="dropdownOption' + (this.optionsSelected[i] ? ' ' + CLASS_SELECTED : '') + '" data-id="' + i + '" title="' + escapedName + '">' +
-				(this.multipleAllowed && !this.selectMultipleWithCtrl && this.optionsSelected[i] ? '<div class="dropdownOptionMultiSelected">' + SVG_ICONS.check + '</div>' : '') +
+			const selected = this.optionsSelected[i];
+			html += '<div class="dropdownOption' + (selected ? ' ' + CLASS_SELECTED : '') + '" data-id="' + i + '" title="' + escapedName + '" role="option" aria-selected="' + selected + '">' +
+				(this.multipleAllowed && !this.selectMultipleWithCtrl ? '<div class="dropdownOptionMultiSelected">' + (selected ? SVG_ICONS.check : '') + '</div>' : '') +
 				escapedName + (typeof this.options[i].hint === 'string' && this.options[i].hint !== '' ? '<span class="dropdownOptionHint">' + escapeHtml(this.options[i].hint!) + '</span>' : '') +
 				(this.showInfo ? '<div class="dropdownOptionInfo" title="' + escapeHtml(this.options[i].value) + '">' + SVG_ICONS.info + '</div>' : '') +
 				'</div>';
@@ -265,22 +321,33 @@ class Dropdown {
 		this.optionsElem.innerHTML = html;
 		this.filterInput.style.display = 'none';
 		this.noResultsElem.style.display = 'none';
-		this.menuElem.style.cssText = 'left:0; overflow-y:auto; max-height:297px;'; // Max height for the dropdown is [filter (31px) + 9.5 * dropdown item (28px) = 297px]
+		this.menuElem.style.cssText = 'left:0; overflow-y:auto;';
 		if (this.dropdownVisible) this.filter();
 	}
 
 	/**
 	 * Filter the options displayed in the dropdown list, based on the filter criteria specified by the user.
+	 * @param preferSelected TRUE => Focus the first selected matching option, FALSE => Keep the current focussed option if possible.
 	 */
-	private filter() {
-		let val = this.filterInput.value.toLowerCase(), match, matches = false;
+	private filter(preferSelected: boolean = false) {
+		let val = this.filterInput.value.toLowerCase(), match, matches = false, firstMatch = -1, firstSelectedMatch = -1;
 		for (let i = 0; i < this.options.length; i++) {
-			match = this.options[i].name.toLowerCase().indexOf(val) > -1;
+			match = this.options[i].name.toLowerCase().indexOf(val) > -1 ||
+				this.options[i].value.toLowerCase().indexOf(val) > -1 ||
+				(typeof this.options[i].hint === 'string' && this.options[i].hint!.toLowerCase().indexOf(val) > -1);
 			(<HTMLElement>this.optionsElem.children[i]).style.display = match ? 'block' : 'none';
-			if (match) matches = true;
+			if (match) {
+				matches = true;
+				if (firstMatch === -1) firstMatch = i;
+				if (firstSelectedMatch === -1 && this.optionsSelected[i]) firstSelectedMatch = i;
+			}
 		}
 		this.filterInput.style.display = 'block';
 		this.noResultsElem.style.display = matches ? 'none' : 'block';
+		this.setFocussedOption(preferSelected && firstSelectedMatch > -1
+			? firstSelectedMatch
+			: this.isOptionVisible(this.focussedOption) ? this.focussedOption : firstMatch);
+		this.positionMenu();
 	}
 
 	/**
@@ -304,7 +371,7 @@ class Dropdown {
 	 * Select a dropdown option.
 	 * @param option The index of the option to select.
 	 */
-	private onOptionClick(option: number, event?: MouseEvent) {
+	private onOptionClick(option: number, event?: MouseEvent | KeyboardEvent) {
 		// Note: Show All is always the first option (0 index) when multiple selected items are allowed
 		let change = false;
 		let doubleClick = this.doubleClickTimeout !== null && this.lastClicked === option;
@@ -393,6 +460,90 @@ class Dropdown {
 		if (this.doubleClickTimeout !== null) {
 			clearTimeout(this.doubleClickTimeout);
 			this.doubleClickTimeout = null;
+		}
+	}
+
+	/**
+	 * Move the focussed option by the specified delta, skipping filtered-out options.
+	 * @param delta The number of visible options to move by.
+	 */
+	private moveFocus(delta: number) {
+		if (this.options.length === 0) return;
+		let option = this.focussedOption;
+		for (let i = 0; i < this.options.length; i++) {
+			option = (option + delta + this.options.length) % this.options.length;
+			if (this.isOptionVisible(option)) {
+				this.setFocussedOption(option, true);
+				return;
+			}
+		}
+	}
+
+	/**
+	 * Focus the first or last visible option.
+	 * @param direction 1 => first option, -1 => last option.
+	 */
+	private focusEdgeOption(direction: number) {
+		const start = direction > 0 ? 0 : this.options.length - 1;
+		for (let i = start; i >= 0 && i < this.options.length; i += direction) {
+			if (this.isOptionVisible(i)) {
+				this.setFocussedOption(i, true);
+				return;
+			}
+		}
+	}
+
+	/**
+	 * Set the focussed option.
+	 * @param option The option to focus, or -1 to clear the focus.
+	 * @param scrollIntoView Should the focussed option be scrolled into view.
+	 */
+	private setFocussedOption(option: number, scrollIntoView: boolean = true) {
+		if (this.focussedOption > -1 && this.focussedOption < this.optionsElem.children.length) {
+			(<HTMLElement>this.optionsElem.children[this.focussedOption]).classList.remove(CLASS_FOCUSSED);
+		}
+		this.focussedOption = option;
+		if (option > -1 && option < this.optionsElem.children.length) {
+			const elem = <HTMLElement>this.optionsElem.children[option];
+			elem.classList.add(CLASS_FOCUSSED);
+			if (scrollIntoView) elem.scrollIntoView({ block: 'nearest' });
+		}
+	}
+
+	/**
+	 * Is the specified option visible after filtering.
+	 * @param option The option to check.
+	 * @returns TRUE => The option is visible, FALSE => The option is hidden.
+	 */
+	private isOptionVisible(option: number) {
+		return option > -1 && option < this.optionsElem.children.length &&
+			(<HTMLElement>this.optionsElem.children[option]).style.display !== 'none';
+	}
+
+	/**
+	 * Does a visible option exactly match the specified value.
+	 * @param value The value to check.
+	 * @returns TRUE => A visible option exactly matches, FALSE => No visible option exactly matches.
+	 */
+	private hasExactVisibleOption(value: string) {
+		const normalizedValue = value.toLowerCase();
+		for (let i = 0; i < this.options.length; i++) {
+			if (this.isOptionVisible(i) && (this.options[i].name.toLowerCase() === normalizedValue || this.options[i].value.toLowerCase() === normalizedValue)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Keep the dropdown menu inside the viewport when opened near the right edge.
+	 */
+	private positionMenu() {
+		this.menuElem.style.left = '0';
+		const menuRect = this.menuElem.getBoundingClientRect();
+		const overflow = menuRect.right - window.innerWidth + 8;
+		if (overflow > 0) {
+			this.menuElem.style.left = '-' + Math.ceil(overflow) + 'px';
 		}
 	}
 }

@@ -27,8 +27,12 @@
 	overflow-x:hidden;
 	text-overflow:ellipsis;
 }
-.dropdownCurrentValue:hover{
+.dropdownCurrentValue:hover, .dropdownCurrentValue:focus{
 	background-color:rgba(128,128,128,0.2);
+}
+.dropdownCurrentValue:focus{
+	outline:1px solid var(--vscode-focusBorder, rgba(128,128,128,0.7));
+	outline-offset:-1px;
 }
 .dropdownCurrentValue:after{
 	position:absolute;
@@ -61,6 +65,7 @@
 	white-space:nowrap;
 	max-width:80vw;
 	min-width:100%;
+	max-height:min(45vh, 360px);
 }
 
 .dropdownOption{
@@ -72,9 +77,11 @@
 	text-overflow:ellipsis;
 	white-space:nowrap;
 	overflow:hidden;
+	min-height:20px;
+	box-sizing:border-box;
 }
 .dropdown.multi .dropdownOption{
-	padding-left:30px;
+	padding-left:34px;
 }
 .dropdownOptions.showInfo .dropdownOption{
 	padding-right:30px;
@@ -82,11 +89,11 @@
 .dropdownOption.selected{
 	background-color:rgba(128,128,128,0.15);
 }
-.dropdownOption:hover{
+.dropdownOption:hover, .dropdownOption.focussed{
 	background-color:var(--vscode-menu-selectionBackground, var(--vscode-menu-background));
 	color:var(--vscode-menu-selectionForeground, var(--vscode-menu-foreground));
 }
-body.vscode-high-contrast .dropdownOption:hover{
+body.vscode-high-contrast .dropdownOption:hover, body.vscode-high-contrast .dropdownOption.focussed{
 	outline:1px dotted var(--vscode-menu-selectionBorder, transparent);
 	outline-offset:-2px;
 }
@@ -108,19 +115,28 @@ body.vscode-high-contrast .dropdownOption:hover{
 
 .dropdownOptionMultiSelected{
 	position:absolute;
-	width:12px;
-	height:16px;
+	width:14px;
+	height:14px;
 	top:7px;
-	left:10px;
+	left:11px;
+	border:1px solid rgba(128,128,128,0.5);
+	border-radius:3px;
+	box-sizing:border-box;
 }
 .dropdownOptionMultiSelected svg{
+	position:absolute;
+	top:-2px;
+	left:1px;
 	fill:var(--vscode-menu-foreground);
 	opacity:0.7;
 }
 
-.dropdownOption:hover svg{
+.dropdownOption:hover svg, .dropdownOption.focussed svg{
 	fill:var(--vscode-menu-selectionForeground, var(--vscode-menu-foreground));
 	opacity:0.85;
+}
+.dropdownOption:hover .dropdownOptionMultiSelected, .dropdownOption.focussed .dropdownOptionMultiSelected{
+	border-color:var(--vscode-menu-selectionForeground, rgba(128,128,128,0.8));
 }
 
 .dropdown.dropdownOpen .dropdownCurrentValue{
@@ -147,6 +163,9 @@ body.vscode-high-contrast .dropdownOption:hover{
 	font-size:13px;
 	line-height:17px;
 	color:var(--vscode-menu-foreground);
+}
+.dropdownFilterInput:focus{
+	border-color:var(--vscode-focusBorder, rgba(128,128,128,0.7));
 }
 
 .dropdownNoResults{
