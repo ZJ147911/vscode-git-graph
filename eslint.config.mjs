@@ -2,8 +2,6 @@ import js from '@eslint/js';
 import typescript from '@typescript-eslint/eslint-plugin';
 import typescriptParser from '@typescript-eslint/parser';
 
-const linebreakStyle = process.platform === 'win32' ? 'windows' : 'unix';
-
 export default [
 	js.configs.recommended,
 	{
@@ -109,8 +107,7 @@ export default [
 			],
 			'key-spacing': 'warn',
 			'linebreak-style': [
-				'warn',
-				linebreakStyle
+				'off'
 			],
 			'new-cap': 'warn',
 			'new-parens': 'warn',
