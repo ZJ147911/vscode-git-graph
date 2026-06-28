@@ -919,6 +919,24 @@ body.tagLabelsRightAligned .gitRef.tag{
 	width:clamp(180px, 24vw, 460px);
 	max-width:460px;
 }
+#branchDropdown .dropdownMenu{
+	width:min(720px, calc(100vw - 24px));
+	max-width:min(720px, calc(100vw - 24px));
+}
+#branchDropdown .dropdownOptions{
+	display:grid;
+	grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
+	grid-auto-flow:row dense;
+}
+#branchDropdown .dropdownOptionBranchMeta{
+	grid-column:1 / -1;
+}
+#branchDropdown .dropdownOptionLocalBranch{
+	grid-column:1;
+}
+#branchDropdown .dropdownOptionRemoteBranch{
+	grid-column:2;
+}
 #pathFilterDropdown {
 	width:clamp(160px, 22vw, 420px);
 	max-width:420px;

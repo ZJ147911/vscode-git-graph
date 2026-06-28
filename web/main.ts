@@ -672,15 +672,22 @@ class GitGraphView {
 	public getBranchOptions(includeShowAll?: boolean): ReadonlyArray<DialogSelectInputOption> {
 		const options: DialogSelectInputOption[] = [];
 		if (includeShowAll) {
-			options.push({ name: getText('ui.showAll'), value: SHOW_ALL_BRANCHES });
+			options.push({ name: getText('ui.showAll'), value: SHOW_ALL_BRANCHES, group: 'branchMeta' });
 		}
-		options.push({ name: 'HEAD', value: 'HEAD' });
+		options.push({ name: 'HEAD', value: 'HEAD', group: 'branchMeta' });
 		for (let i = 0; i < this.config.customBranchGlobPatterns.length; i++) {
-			options.push({ name: 'Glob: ' + this.config.customBranchGlobPatterns[i].name, value: this.config.customBranchGlobPatterns[i].glob });
+			options.push({ name: 'Glob: ' + this.config.customBranchGlobPatterns[i].name, value: this.config.customBranchGlobPatterns[i].glob, group: 'branchMeta' });
 		}
+		const branchOptions: DialogSelectInputOption[] = [];
 		for (let i = 0; i < this.gitBranches.length; i++) {
-			options.push({ name: this.gitBranches[i].indexOf('remotes/') === 0 ? this.gitBranches[i].substring(8) : this.gitBranches[i], value: this.gitBranches[i] });
+			const isRemote = this.gitBranches[i].indexOf('remotes/') === 0;
+			branchOptions.push({ name: isRemote ? this.gitBranches[i].substring(8) : this.gitBranches[i], value: this.gitBranches[i], group: isRemote ? 'remoteBranch' : 'localBranch' });
 		}
+		options.push(...branchOptions.sort((a, b) =>
+			a.group === b.group
+				? a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+				: a.group === 'localBranch' ? -1 : 1
+		));
 		return options;
 	}
 	public getAuthorOptions(): ReadonlyArray<DialogSelectInputOption> {

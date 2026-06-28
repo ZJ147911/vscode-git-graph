@@ -64,6 +64,7 @@ interface DialogCheckboxInput {
 interface DialogSelectInputOption {
 	readonly name: string;
 	readonly value: string;
+	readonly group?: string;
 }
 
 interface DialogRadioInputOption {

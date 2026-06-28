@@ -2,6 +2,7 @@ interface DropdownOption {
 	readonly name: string;
 	readonly value: string;
 	readonly hint?: string;
+	readonly group?: string;
 }
 
 /**
@@ -311,7 +312,7 @@ class Dropdown {
 		for (let i = 0; i < this.options.length; i++) {
 			const escapedName = escapeHtml(this.options[i].name);
 			const selected = this.optionsSelected[i];
-			html += '<div class="dropdownOption' + (selected ? ' ' + CLASS_SELECTED : '') + '" data-id="' + i + '" title="' + escapedName + '" role="option" aria-selected="' + selected + '">' +
+			html += '<div class="dropdownOption' + this.getOptionGroupClass(this.options[i]) + (selected ? ' ' + CLASS_SELECTED : '') + '" data-id="' + i + '" title="' + escapedName + '" role="option" aria-selected="' + selected + '">' +
 				(this.multipleAllowed && !this.selectMultipleWithCtrl ? '<div class="dropdownOptionMultiSelected">' + (selected ? SVG_ICONS.check : '') + '</div>' : '') +
 				escapedName + (typeof this.options[i].hint === 'string' && this.options[i].hint !== '' ? '<span class="dropdownOptionHint">' + escapeHtml(this.options[i].hint!) + '</span>' : '') +
 				(this.showInfo ? '<div class="dropdownOptionInfo" title="' + escapeHtml(this.options[i].value) + '">' + SVG_ICONS.info + '</div>' : '') +
@@ -344,6 +345,7 @@ class Dropdown {
 		}
 		this.filterInput.style.display = 'block';
 		this.noResultsElem.style.display = matches ? 'none' : 'block';
+		this.updateGroupedOptionRows();
 		this.setFocussedOption(preferSelected && firstSelectedMatch > -1
 			? firstSelectedMatch
 			: this.isOptionVisible(this.focussedOption) ? this.focussedOption : firstMatch);
@@ -365,6 +367,18 @@ class Dropdown {
 			if (this.optionsSelected[i]) selected.push(names ? this.options[i].name : this.options[i].value);
 		}
 		return selected;
+	}
+
+	/**
+	 * Get the CSS class corresponding to a dropdown option group.
+	 * @param option The option to classify.
+	 * @returns The CSS class for the option group.
+	 */
+	private getOptionGroupClass(option: DropdownOption) {
+		if (option.group === 'localBranch') return ' dropdownOptionLocalBranch';
+		if (option.group === 'remoteBranch') return ' dropdownOptionRemoteBranch';
+		if (option.group === 'branchMeta') return ' dropdownOptionBranchMeta';
+		return '';
 	}
 
 	/**
@@ -533,6 +547,27 @@ class Dropdown {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Update CSS grid rows for grouped dropdown options after filtering.
+	 */
+	private updateGroupedOptionRows() {
+		let branchGroupStartRow = 1, localBranchRow = 0, remoteBranchRow = 0;
+		for (let i = 0; i < this.options.length; i++) {
+			const elem = <HTMLElement>this.optionsElem.children[i];
+			elem.style.gridRow = '';
+			if (this.isOptionVisible(i) && this.options[i].group === 'branchMeta') {
+				branchGroupStartRow++;
+			}
+		}
+		for (let i = 0; i < this.options.length; i++) {
+			if (this.isOptionVisible(i) && this.options[i].group === 'localBranch') {
+				(<HTMLElement>this.optionsElem.children[i]).style.gridRow = '' + (branchGroupStartRow + localBranchRow++);
+			} else if (this.isOptionVisible(i) && this.options[i].group === 'remoteBranch') {
+				(<HTMLElement>this.optionsElem.children[i]).style.gridRow = '' + (branchGroupStartRow + remoteBranchRow++);
+			}
+		}
 	}
 
 	/**
