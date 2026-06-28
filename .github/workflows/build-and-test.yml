@@ -1,4 +1,4 @@
-name: 'Build & Test'
+name: Build & Test
 
 on:
   push:
@@ -14,10 +14,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - uses: actions/setup-node@v1
-      with:
-        node-version: '12.x'
-    - run: npm install
-    - run: npm run compile
-    - run: npm run test
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run compile
+      - run: npm test
+      - run: npm run package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: git-graph-vsix
+          path: '*.vsix'
