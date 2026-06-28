@@ -94,6 +94,48 @@ export const EventEmitter = jest.fn(() => ({
 	event: jest.fn()
 }));
 
+const nlsMessages: { [key: string]: string } = {
+	'ui.avatarCacheCleared': 'The Avatar Cache was successfully cleared.',
+	'ui.cannotAddRepo': '{error} Therefore it could not be added to Git Graph.',
+	'ui.cannotOpenFile': 'Unable to Open File: {filePath}',
+	'ui.cannotOpenFileMissingArgs': 'Unable to Open File: The command was not called with the required arguments.',
+	'ui.cannotWriteConfigFile': 'Failed to write the Git Graph Repository Configuration File to "{path}".',
+	'ui.codeReviewEnded': 'Successfully ended Code Review "{review}".',
+	'ui.configFileExported': 'Successfully exported the Git Graph Repository Configuration to "{path}".',
+	'ui.configFileImported': 'Git Graph Repository Configuration was successfully imported for the repository "{repo}".',
+	'ui.configFileUpdated': 'A newer Git Graph Repository Configuration File has been detected for the repository "{repo}". Would you like to override your current repository configuration with the new changes?',
+	'ui.copy': 'Copy',
+	'ui.endedAllCodeReviews': 'Ended All Code Reviews in Workspace',
+	'ui.errorCheckingDir': 'An unexpected error occurred while checking if the "{path}" directory exists. This directory is used to store the Git Graph Repository Configuration file.',
+	'ui.errorClearingAvatarCache': 'An unexpected error occurred while running the command "Clear Avatar Cache".',
+	'ui.errorEndingCodeReview': 'An unexpected error occurred while running the command "End a specific Code Review in Workspace...".',
+	'ui.errorGettingVersionInfo': 'An unexpected error occurred while retrieving version information.',
+	'ui.errorResumingCodeReview': 'An unexpected error occurred while running the command "Resume a specific Code Review in Workspace...".',
+	'ui.errorRunningFetchCommand': 'An unexpected error occurred while running the command "Fetch from Remote(s)".',
+	'ui.folderNotInWorkspace': 'The folder "{path}" is not within the opened Visual Studio Code workspace, and therefore could not be added to Git Graph.',
+	'ui.folderNotGitRepo': 'The folder "{path}" is not a Git repository.',
+	'ui.folderInKnownRepo': 'The folder "{path}" is contained within the known repository "{root}".',
+	'ui.invalidConfigValue': 'The value for "{value}" in the configuration file "{file}" is invalid.',
+	'ui.no': 'No',
+	'ui.noActiveCodeReviews': 'There are no Code Reviews in progress within the current workspace.',
+	'ui.repoAdded': 'The repository "{repo}" was added to Git Graph.',
+	'ui.selectCodeReviewToEnd': 'Select the Code Review you want to end:',
+	'ui.selectCodeReviewToResume': 'Select the Code Review you want to resume:',
+	'ui.selectRepoToFetch': 'Select the repository you want to open in Git Graph, and fetch from remote(s):',
+	'ui.selectRepoToRemove': 'Select a repository to remove from Git Graph:',
+	'ui.viewGitGraph': 'View Git Graph',
+	'ui.yes': 'Yes'
+};
+
+export const l10n = {
+	t: jest.fn((key: string, args?: { [key: string]: any }) => {
+		const message = nlsMessages[key] || key;
+		return args === undefined
+			? message
+			: message.replace(/\{([^}]+)\}/g, (_, name) => args[name]);
+	})
+};
+
 export class Uri implements vscode.Uri {
 	public readonly scheme: string;
 	public readonly authority: string;

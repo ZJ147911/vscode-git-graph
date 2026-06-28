@@ -1891,27 +1891,10 @@ describe('RepoManager', () => {
 
 				// Assert
 				const expected: GitRepoSet = {
-					'/path/to/workspace-folder1/repo': {
-						cdvDivider: 0.5,
-						cdvHeight: 250,
-						columnWidths: null,
-						commitOrdering: RepoCommitOrdering.Default,
-						fileViewType: FileViewType.Default,
-						hideRemotes: [],
-						includeCommitsMentionedByReflogs: BooleanOverride.Default,
-						issueLinkingConfig: null,
+					'/path/to/workspace-folder1/repo': mockRepoState({
 						lastImportAt: 1587559258000,
-						name: null,
-						onlyFollowFirstParent: BooleanOverride.Default,
-						onRepoLoadShowCheckedOutBranch: BooleanOverride.Default,
-						onRepoLoadShowSpecificBranches: null,
-						pullRequestConfig: null,
-						showRemoteBranches: true,
-						showRemoteBranchesV2: BooleanOverride.Default,
-						showStashes: BooleanOverride.Default,
-						showTags: BooleanOverride.Default,
 						workspaceFolderIndex: 0
-					}
+					})
 				};
 				expected['/path/to/workspace-folder1/repo'][stateKey] = stateValue;
 				expect(repoManager.getRepos()).toStrictEqual(expected);
@@ -2244,27 +2227,10 @@ describe('RepoManager', () => {
 			});
 			expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Successfully exported the Git Graph Repository Configuration to "/path/to/workspace-folder1/repo1/.vscode/vscode-git-graph.json".');
 			expect(spyOnSaveRepos).toHaveBeenCalledWith({
-				'/path/to/workspace-folder1/repo1': {
-					cdvDivider: 0.5,
-					cdvHeight: 250,
-					columnWidths: null,
-					commitOrdering: RepoCommitOrdering.Default,
-					fileViewType: FileViewType.Default,
-					hideRemotes: [],
-					includeCommitsMentionedByReflogs: BooleanOverride.Default,
-					issueLinkingConfig: null,
+				'/path/to/workspace-folder1/repo1': mockRepoState({
 					lastImportAt: 1587559258000,
-					name: null,
-					onlyFollowFirstParent: BooleanOverride.Default,
-					onRepoLoadShowCheckedOutBranch: BooleanOverride.Default,
-					onRepoLoadShowSpecificBranches: null,
-					pullRequestConfig: null,
-					showRemoteBranches: true,
-					showRemoteBranchesV2: BooleanOverride.Default,
-					showStashes: BooleanOverride.Default,
-					showTags: BooleanOverride.Default,
 					workspaceFolderIndex: 0
-				}
+				})
 			});
 
 			// Teardown
@@ -2322,27 +2288,10 @@ describe('RepoManager', () => {
 			});
 			expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Successfully exported the Git Graph Repository Configuration to "/path/to/workspace-folder1/repo1/.vscode/vscode-git-graph.json".');
 			expect(spyOnSaveRepos).toHaveBeenCalledWith({
-				'/path/to/workspace-folder1/repo1': {
-					cdvDivider: 0.5,
-					cdvHeight: 250,
-					columnWidths: null,
-					commitOrdering: RepoCommitOrdering.Default,
-					fileViewType: FileViewType.Default,
-					hideRemotes: [],
-					includeCommitsMentionedByReflogs: BooleanOverride.Default,
-					issueLinkingConfig: null,
+				'/path/to/workspace-folder1/repo1': mockRepoState({
 					lastImportAt: 1587559258000,
-					name: null,
-					onlyFollowFirstParent: BooleanOverride.Default,
-					onRepoLoadShowCheckedOutBranch: BooleanOverride.Default,
-					onRepoLoadShowSpecificBranches: null,
-					pullRequestConfig: null,
-					showRemoteBranches: true,
-					showRemoteBranchesV2: BooleanOverride.Default,
-					showStashes: BooleanOverride.Default,
-					showTags: BooleanOverride.Default,
 					workspaceFolderIndex: 0
-				}
+				})
 			});
 
 			// Teardown
