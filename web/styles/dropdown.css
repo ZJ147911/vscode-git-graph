@@ -6,7 +6,8 @@
 	margin-top:3px;
 	font-weight:normal;
 	text-align:left;
-	min-width:8vw;
+	min-width:140px;
+	max-width:360px;
 }
 .dropdown.loaded{
 	display:inline-block;
@@ -24,6 +25,7 @@
 	-webkit-user-select:none;
 	user-select:none;
 	white-space:nowrap;
+	max-width:100%;
 	overflow-x:hidden;
 	text-overflow:ellipsis;
 }
@@ -63,7 +65,9 @@
 	overflow-x:hidden;
 	margin-top:-1px;
 	white-space:nowrap;
-	max-width:80vw;
+	box-sizing:border-box;
+	width:100%;
+	max-width:100%;
 	min-width:100%;
 	max-height:min(45vh, 360px);
 }

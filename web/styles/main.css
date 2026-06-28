@@ -846,20 +846,20 @@ body.tagLabelsRightAligned .gitRef.tag{
 
 #controls{
 	display:block;
-	position: relative;
+	position:relative;
 	left:0;
 	right:0;
 	top:0;
-	padding:4px 132px 4px 0;
-	background-color: var(--vscode-editor-background);
+	padding:6px 132px 6px 10px;
+	background-color:var(--vscode-editor-background);
 	border-bottom:1px solid rgba(128,128,128,0.5);
-	line-height:32px;
-	text-align:center;
+	line-height:26px;
+	text-align:left;
 	font-weight:700;
 	font-size:13px;
 	-webkit-user-select:none;
 	user-select:none;
-    margin-left:10px;
+	box-sizing:border-box;
 }
 
 #controls.sticky {
@@ -867,13 +867,34 @@ body.tagLabelsRightAligned .gitRef.tag{
 	z-index:12;
 }
 
-#repoControl, #branchControl, #showRemoteBranchesControl, #simplifyByDecorationControl, #pathFilterControl, #authorControl{
-	display:inline-block;
+#filterControls{
+	display:flex;
+	flex-wrap:wrap;
+	align-items:center;
+	gap:6px 12px;
+	min-width:0;
+}
+#repoControl, #branchControl, #pathFilterControl, #authorControl{
+	display:flex;
+	align-items:center;
+	min-width:0;
 	white-space:nowrap;
-	margin-right:10px;
+}
+#repoControl > .unselectable, #branchControl > .unselectable, #pathFilterControl > .unselectable, #authorControl > .unselectable{
+	margin-right:4px;
+	color:var(--vscode-descriptionForeground);
+	font-weight:600;
+}
+#showRemoteBranchesControl, #simplifyByDecorationControl{
+	display:inline-flex;
+	align-items:center;
+	height:26px;
+	white-space:nowrap;
+	font-weight:600;
+	color:var(--vscode-descriptionForeground);
 }
 #repoDropdown, #branchDropdown, #pathFilterDropdown, #authorDropdown{
-	margin-left:3px;
+	margin-left:0;
 }
 #showRemoteBranchesControl > .customCheckbox, #simplifyByDecorationControl > .customCheckbox{
 	margin-right:6px;
@@ -882,10 +903,29 @@ body.tagLabelsRightAligned .gitRef.tag{
 	display:none;
 }
 #branchControl, #authorControl, #pathFilterControl, #repoControl {
-	display:flex;
+	min-width:0;
 }
 .dropdown {
-	width:100%;
+	width:clamp(140px, 18vw, 360px);
+	min-width:140px;
+	max-width:360px;
+	flex:0 1 auto;
+}
+#repoDropdown {
+	width:clamp(160px, 20vw, 420px);
+	max-width:420px;
+}
+#branchDropdown {
+	width:clamp(180px, 24vw, 460px);
+	max-width:460px;
+}
+#pathFilterDropdown {
+	width:clamp(160px, 22vw, 420px);
+	max-width:420px;
+}
+#authorDropdown {
+	width:clamp(140px, 18vw, 320px);
+	max-width:320px;
 }
 
 #currentBtn, #findBtn, #terminalBtn, #settingsBtn, #fetchBtn, #refreshBtn{

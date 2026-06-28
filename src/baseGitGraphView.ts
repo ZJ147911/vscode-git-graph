@@ -767,15 +767,15 @@ export abstract class BaseGitGraphView extends Disposable {
 			if (config.toolbarButtonVisibility.remotes) { optElements++; hideRemotes = ''; }
 			if (config.toolbarButtonVisibility.simplify) { optElements++; hideSimplify = ''; }
 			let pathFilterStyle = 'style="display: none"';
-			if (config.toolbarButtonVisibility.pathFilter) { optElements++; pathFilterStyle = 'style="flex: 1;"'; }
+			if (config.toolbarButtonVisibility.pathFilter) { optElements++; pathFilterStyle = ''; }
 			body = `<body>
 			<div id="view" tabindex="-1">
 				<div id="controls"${stickyClassAttr}>
-					<div id="filterControls" style="display: flex; flex-wrap: wrap; justify-content: center">
-					<span id="repoControl" style="flex: 1;"><span class="unselectable">${wt('ui.repo')}: </span><div id="repoDropdown" class="dropdown"></div></span>
-					<span id="branchControl" style="flex: 2;"><span class="unselectable">${wt('ui.branches')}: </span><div id="branchDropdown" class="dropdown"></div></span>
+					<div id="filterControls">
+					<span id="repoControl"><span class="unselectable">${wt('ui.repo')}: </span><div id="repoDropdown" class="dropdown"></div></span>
+					<span id="branchControl"><span class="unselectable">${wt('ui.branches')}: </span><div id="branchDropdown" class="dropdown"></div></span>
 					<span id="pathFilterControl" ${pathFilterStyle} title="${wt('ui.selectPathByContextMenu')}"><span class="unselectable">${wt('ui.paths')}: </span><div id="pathFilterDropdown" class="dropdown"></div></span>
-					<span id="authorControl" style="flex: 1;"><span class="unselectable">${wt('ui.authors')}: </span><div id="authorDropdown" class="dropdown"></div></span>
+					<span id="authorControl"><span class="unselectable">${wt('ui.authors')}: </span><div id="authorDropdown" class="dropdown"></div></span>
 					<label ${hideRemotes} id="showRemoteBranchesControl" title="${wt('ui.showRemoteBranches')}"><input type="checkbox" id="showRemoteBranchesCheckbox" tabindex="-1"><span class="customCheckbox"></span>${wt('ui.remotes')}</label>
 					<label ${hideSimplify} id="simplifyByDecorationControl" title="${wt('ui.simplifyByDecoration')}"><input type="checkbox" id="simplifyByDecorationCheckbox" tabindex="-1"><span class="customCheckbox"></span>${wt('ui.simplify')}</label>
 					<div id="currentBtn" title="${wt('ui.current')}"></div>
