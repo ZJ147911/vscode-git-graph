@@ -2649,30 +2649,45 @@ class GitGraphView {
 						this.toggleCommitSelection(commit.hash, eventElem);
 					}
 				} else if (mouseEvent.ctrlKey || mouseEvent.metaKey) {
-					// Ctrl/Cmd-click: toggle individual commit selection
-					this.toggleCommitSelection(commit.hash, eventElem);
-
-					// Check if exactly 2 commits are selected to show diff
-					if (this.selectedCommits.size === 2) {
-						// Get the two selected commits
-						const selectedHashes = Array.from(this.selectedCommits);
-						const commitElems = selectedHashes.map(hash => {
-							const index = this.commitLookup[hash];
-							return document.querySelector(`tr.commit[data-id="${index}"]`) as HTMLElement;
-						}).filter(elem => elem !== null);
-
-						if (commitElems.length === 2) {
-							// Load comparison between the two commits
-							const [firstIndex, secondIndex] = selectedHashes.map(hash => this.commitLookup[hash]);
-							if (firstIndex < secondIndex) {
-								this.loadCommitComparison(commitElems[1], commitElems[0]);
-							} else {
-								this.loadCommitComparison(commitElems[0], commitElems[1]);
-							}
+					handledEvent(e);
+					if (this.expandedCommit !== null && this.expandedCommit.commitHash !== commit.hash && this.expandedCommit.commitElem !== null) {
+						if (this.expandedCommit.compareWithHash === commit.hash) {
+							this.closeCommitComparison(true);
+						} else {
+							this.clearCommitSelection();
+							this.toggleCommitSelection(this.expandedCommit.commitHash, this.expandedCommit.commitElem);
+							this.toggleCommitSelection(commit.hash, eventElem);
+							this.loadCommitComparison(this.expandedCommit.commitElem, eventElem);
 						}
-					} else if (this.selectedCommits.size > 2) {
-						// More than 2 commits selected, close any open details
-						this.closeCommitDetails(true);
+					} else {
+						// Ctrl/Cmd-click: toggle individual commit selection
+						this.toggleCommitSelection(commit.hash, eventElem);
+
+						// Check if exactly 2 commits are selected to show diff
+						if (this.selectedCommits.size === 2) {
+							// Get the two selected commits
+							const selectedHashes = Array.from(this.selectedCommits);
+							const commitElems = selectedHashes.map(hash => {
+								const index = this.commitLookup[hash];
+								return document.querySelector(`tr.commit[data-id="${index}"]`) as HTMLElement;
+							}).filter(elem => elem !== null);
+
+							if (commitElems.length === 2) {
+								// Load comparison between the two commits
+								const [firstIndex, secondIndex] = selectedHashes.map(hash => this.commitLookup[hash]);
+								if (firstIndex < secondIndex) {
+									this.loadCommitComparison(commitElems[1], commitElems[0]);
+								} else {
+									this.loadCommitComparison(commitElems[0], commitElems[1]);
+								}
+							}
+						} else if (this.selectedCommits.size < 2 && this.expandedCommit !== null && this.expandedCommit.compareWithHash !== null) {
+							// Less than 2 commits selected but a comparison was open - close it
+							this.closeCommitDetails(true);
+						} else if (this.selectedCommits.size > 2) {
+							// More than 2 commits selected, close any open details
+							this.closeCommitDetails(true);
+						}
 					}
 				} else if (this.expandedCommit !== null) {
 					if (this.expandedCommit.commitHash === commit.hash) {
