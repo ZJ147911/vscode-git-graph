@@ -348,6 +348,7 @@
 	"configuration.toolbarButtonVisibility": "Object specifying the default visibility of toolbar items. Example: {\"Remotes\":true, \"Simplify\":true}",
 	"configuration.toolbarButtonVisibility.Remotes": "Visibility of the Remotes checkbox",
 	"configuration.toolbarButtonVisibility.Simplify": "Visibility of the Simplify checkbox",
+	"configuration.toolbarButtonVisibility.Paths": "Visibility of the Paths dropdown",
 	"configuration.useMailmap": "Respect [.mailmap](https://git-scm.com/docs/git-check-mailmap#_mapping_authors) files when displaying author & committer names and email addresses.",
 	"configuration.useMailmap.deprecationMessage": "Depreciated: This setting has been renamed to git-graph.repository.useMailmap",
 	"configuration.viewLocation": "Specifies where to display the Git Graph view by default.",

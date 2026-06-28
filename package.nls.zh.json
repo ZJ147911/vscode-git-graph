@@ -348,6 +348,7 @@
 	"configuration.toolbarButtonVisibility": "指定工具栏项目默认可见性的对象。示例：{\"Remotes\":true, \"Simplify\":true}",
 	"configuration.toolbarButtonVisibility.Remotes": "远程仓库复选框的可见性",
 	"configuration.toolbarButtonVisibility.Simplify": "简化复选框的可见性",
+	"configuration.toolbarButtonVisibility.Paths": "路径下拉框的可见性",
 	"configuration.useMailmap": "在显示作者和提交者姓名和电子邮件地址时尊重 [.mailmap](https://git-scm.com/docs/git-check-mailmap#_mapping_authors) 文件。",
 	"configuration.useMailmap.deprecationMessage": "已弃用：此设置已重命名为 git-graph.repository.useMailmap",
 	"configuration.viewLocation": "指定默认显示 Git Graph 视图的位置。",

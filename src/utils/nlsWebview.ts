@@ -21,7 +21,7 @@ function getLocaleBundle(bundleDir: string, locale: string): Record<string, stri
 	const paths = [
 		path.join(bundleDir, `bundle.l10n.${locale}.json`),
 		path.join(bundleDir, `bundle.l10n.${locale.split('-')[0]}.json`),
-		path.join(bundleDir, 'bundle.l10n.json'),
+		path.join(bundleDir, 'bundle.l10n.json')
 	];
 
 	let result: Record<string, string> = {};
