@@ -160,11 +160,15 @@ class GitGraphView {
 			this.currentAuthors = prevState.currentAuthors;
 			this.maxCommits = prevState.maxCommits;
 			this.expandedCommit = prevState.expandedCommit;
-			this.avatars = prevState.avatars;
-			this.gitConfig = prevState.gitConfig;
+			this.avatars = prevState.avatars || {};
+			this.gitConfig = prevState.gitConfig || null;
 			this.selectedCommits = new Set(prevState.selectedCommits || []);
-			this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchHead, prevState.gitRemotes, prevState.gitStashes, true);
-			this.loadCommits(prevState.commits, prevState.commitHead, prevState.gitTags, prevState.moreCommitsAvailable, prevState.onlyFollowFirstParent);
+			if (prevState.commits && prevState.gitBranches && prevState.gitRemotes && prevState.gitStashes && prevState.gitTags && typeof prevState.moreCommitsAvailable === 'boolean' && typeof prevState.onlyFollowFirstParent === 'boolean') {
+				this.loadRepoInfo(prevState.gitBranches, prevState.gitBranchHead || null, prevState.gitRemotes, prevState.gitStashes, true);
+				this.loadCommits(prevState.commits, prevState.commitHead || null, prevState.gitTags, prevState.moreCommitsAvailable, prevState.onlyFollowFirstParent);
+			} else {
+				this.currentRepoLoading = true;
+			}
 			this.findWidget.restoreState(prevState.findWidget);
 			this.settingsWidget.restoreState(prevState.settingsWidget);
 			this.showRemoteBranchesElem.checked = getShowRemoteBranches(this.gitRepos[prevState.currentRepo].showRemoteBranchesV2);
@@ -878,38 +882,15 @@ class GitGraphView {
 	public saveState() {
 		const endPerfMeasure = startPerfMeasure('saveState', () => this.commits.length + ' commits');
 		try {
-			let expandedCommit;
-			if (this.expandedCommit !== null) {
-				expandedCommit = Object.assign({}, this.expandedCommit);
-				expandedCommit.commitElem = null;
-				expandedCommit.compareWithElem = null;
-				expandedCommit.contextMenuOpen = {
-					summary: false,
-					fileView: -1
-				};
-			} else {
-				expandedCommit = null;
-			}
-
 			VSCODE_API.setState({
 				currentRepo: this.currentRepo,
 				currentRepoLoading: this.currentRepoLoading,
 				gitRepos: this.gitRepos,
-				gitBranches: this.gitBranches,
-				gitBranchHead: this.gitBranchHead,
 				gitConfig: this.gitConfig,
-				gitRemotes: this.gitRemotes,
-				gitStashes: this.gitStashes,
-				gitTags: this.gitTags,
-				commits: this.commits,
-				commitHead: this.commitHead,
-				avatars: this.avatars,
 				currentBranches: this.currentBranches,
 				currentAuthors: this.currentAuthors,
-				moreCommitsAvailable: this.moreCommitsAvailable,
 				maxCommits: this.maxCommits,
-				onlyFollowFirstParent: this.onlyFollowFirstParent,
-				expandedCommit: expandedCommit,
+				expandedCommit: this.getPersistableExpandedCommit(),
 				scrollTop: this.scrollTop,
 				selectedCommits: Array.from(this.selectedCommits),
 				findWidget: this.findWidget.getState(),
@@ -918,6 +899,32 @@ class GitGraphView {
 		} finally {
 			endPerfMeasure();
 		}
+	}
+
+	private getPersistableExpandedCommit(): ExpandedCommit | null {
+		if (this.expandedCommit === null) return null;
+		return {
+			index: this.expandedCommit.index,
+			commitHash: this.expandedCommit.commitHash,
+			commitElem: null,
+			compareWithHash: this.expandedCommit.compareWithHash,
+			compareWithElem: null,
+			commitDetails: null,
+			fileChanges: null,
+			fileTree: null,
+			avatar: null,
+			codeReview: null,
+			lastViewedFile: this.expandedCommit.lastViewedFile,
+			loading: true,
+			scrollTop: {
+				summary: this.expandedCommit.scrollTop.summary,
+				fileView: this.expandedCommit.scrollTop.fileView
+			},
+			contextMenuOpen: {
+				summary: false,
+				fileView: -1
+			}
+		};
 	}
 
 	public saveRepoState() {
