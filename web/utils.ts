@@ -118,6 +118,10 @@ const PATH_FILTER_WS_ALL = 'workspace_all';
 const COLUMN_HIDDEN = -100;
 const COLUMN_AUTO = -101;
 const PERF_MEASURE_STORAGE_KEY = 'gitGraph.performanceMeasurements';
+const COMMIT_ROW_HEIGHT = 24;
+const VIRTUAL_TABLE_MIN_COMMITS = 250;
+const VIRTUAL_TABLE_OVERSCAN_ROWS = 40;
+const VIRTUAL_TABLE_WINDOW_GRANULARITY = 20;
 
 function arePerfMeasurementsEnabled() {
 	try {

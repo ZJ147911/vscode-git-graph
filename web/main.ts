@@ -1,3 +1,9 @@
+interface CommitRenderRange {
+	readonly start: number;
+	readonly end: number;
+	readonly virtualized: boolean;
+}
+
 class GitGraphView {
 	private gitRepos: GG.GitRepoSet;
 	private gitBranches: ReadonlyArray<string> = [];
@@ -39,6 +45,8 @@ class GitGraphView {
 	private maxCommits: number;
 	private scrollTop = 0;
 	private renderedGitBranchHead: string | null = null;
+	private renderedCommitRange: CommitRenderRange = { start: 0, end: 0, virtualized: false };
+	private virtualTableAnimationFrame: number | null = null;
 
 	private lastScrollToStash: {
 		time: number,
@@ -1257,6 +1265,7 @@ class GitGraphView {
 		const widthsAtVertices = this.config.referenceLabels.branchLabelsAlignedToGraph ? this.graph.getWidthsAtVertices() : [];
 		const mutedCommits = this.graph.getMutedCommits(currentHash);
 		const dimmedCommits = this.graph.getPathFilterDimmedCommits();
+		const commitRange = this.getCommitRenderRange();
 		const textFormatter = new TextFormatter(this.commits, this.gitRepos[this.currentRepo].issueLinkingConfig, {
 			emoji: true,
 			issueLinking: true,
@@ -1269,7 +1278,11 @@ class GitGraphView {
 			(colVisibility.commit ? '<th class="tableColHeader" data-col="4">' + escapeHtml(getText('ui.colCommit')) + '</th>' : '') +
 			'</tr>';
 
-		for (let i = 0; i < this.commits.length; i++) {
+		if (commitRange.virtualized && commitRange.start > 0) {
+			html += this.getCommitTableSpacerHtml(commitRange.start * COMMIT_ROW_HEIGHT);
+		}
+
+		for (let i = commitRange.start; i < commitRange.end; i++) {
 			let commit = this.commits[i];
 
 			let message = '<span class="text">' + textFormatter.format(commit.message) + '</span>';
@@ -1320,10 +1333,14 @@ class GitGraphView {
 
 
 		}
+		if (commitRange.virtualized && commitRange.end < this.commits.length) {
+			html += this.getCommitTableSpacerHtml((this.commits.length - commitRange.end) * COMMIT_ROW_HEIGHT);
+		}
 		function getResizeColHtml(col: number) {
 			return (col > 0 ? '<span class="resizeCol left" data-col="' + (col - 1) + '"></span>' : '') + (col < 4 ? '<span class="resizeCol right" data-col="' + col + '"></span>' : '');
 		}
 		this.tableElem.innerHTML = '<table>' + html + '</table>';
+		this.renderedCommitRange = commitRange;
 		this.footerElem.innerHTML = this.moreCommitsAvailable ? '<div id="loadMoreCommitsBtn" class="roundedBtn">' + escapeHtml(getText('ui.loadMoreCommits')) + '</div>' : '';
 		this.makeTableResizable();
 		this.findWidget.refresh();
@@ -1391,9 +1408,55 @@ class GitGraphView {
 		}
 	}
 
+	private getCommitRenderRange(): CommitRenderRange {
+		if (!this.shouldVirtualizeCommitTable()) {
+			return { start: 0, end: this.commits.length, virtualized: false };
+		}
+
+		const rowHeight = COMMIT_ROW_HEIGHT;
+		const tableTop = this.controlsElem.offsetHeight;
+		const headerHeight = this.tableColHeadersElem !== null && this.tableColHeadersElem.clientHeight > 0 ? this.tableColHeadersElem.clientHeight : 31;
+		const visibleTop = Math.max(0, this.viewElem.scrollTop - tableTop - headerHeight);
+		const visibleBottom = Math.max(visibleTop, this.viewElem.scrollTop - tableTop + this.viewElem.clientHeight);
+		const firstVisible = Math.floor(visibleTop / rowHeight);
+		const lastVisible = Math.ceil(visibleBottom / rowHeight);
+		const start = Math.max(0, Math.floor(Math.max(0, firstVisible - VIRTUAL_TABLE_OVERSCAN_ROWS) / VIRTUAL_TABLE_WINDOW_GRANULARITY) * VIRTUAL_TABLE_WINDOW_GRANULARITY);
+		const end = Math.min(this.commits.length, Math.ceil((lastVisible + VIRTUAL_TABLE_OVERSCAN_ROWS) / VIRTUAL_TABLE_WINDOW_GRANULARITY) * VIRTUAL_TABLE_WINDOW_GRANULARITY);
+		return { start: start, end: Math.max(start, end), virtualized: true };
+	}
+
+	private shouldVirtualizeCommitTable() {
+		return this.commits.length > VIRTUAL_TABLE_MIN_COMMITS
+			&& !this.findWidget.isVisible()
+			&& (this.expandedCommit === null || this.isCdvDocked());
+	}
+
+	private getCommitTableSpacerHtml(height: number) {
+		return '<tr class="commitTableSpacer" aria-hidden="true"><td colspan="' + this.getNumColumns() + '" style="height:' + height + 'px"></td></tr>';
+	}
+
+	private scheduleVirtualTableRender() {
+		if (!this.renderedCommitRange.virtualized || this.virtualTableAnimationFrame !== null) return;
+
+		const nextRange = this.getCommitRenderRange();
+		if (nextRange.start === this.renderedCommitRange.start && nextRange.end === this.renderedCommitRange.end && nextRange.virtualized === this.renderedCommitRange.virtualized) {
+			return;
+		}
+
+		this.virtualTableAnimationFrame = window.requestAnimationFrame(() => {
+			this.virtualTableAnimationFrame = null;
+			this.renderTable();
+		});
+	}
+
 	private renderUncommittedChanges() {
 		const colVisibility = this.getColumnVisibility(), date = formatShortDate(this.commits[0].date);
-		document.getElementById('uncommittedChanges')!.innerHTML = '<td></td><td><b>' + escapeHtml(this.commits[0].message) + '</b></td>' +
+		const uncommittedChangesElem = document.getElementById('uncommittedChanges');
+		if (uncommittedChangesElem === null) {
+			this.renderTable();
+			return;
+		}
+		uncommittedChangesElem.innerHTML = '<td></td><td><b>' + escapeHtml(this.commits[0].message) + '</b></td>' +
 			(colVisibility.date ? '<td class="dateCol text" title="' + date.title + '">' + date.formatted + '</td>' : '') +
 			(colVisibility.author ? '<td class="authorCol text" title="' + escapeHtml(getText('ui.uncommittedChangesTitle')) + '">*</td>' : '') +
 			(colVisibility.commit ? '<td class="text" title="' + escapeHtml(getText('ui.uncommittedChangesTitle')) + '">*</td>' : '');
@@ -2666,7 +2729,13 @@ class GitGraphView {
 	 * @param flash Should the commit flash after it has been scrolled to.
 	 */
 	public scrollToCommit(hash: string, alwaysCenterCommit: boolean, flash: boolean = false) {
-		const elem = findCommitElemWithId(getCommitElems(), this.getCommitId(hash));
+		const commitId = this.getCommitId(hash);
+		let elem = findCommitElemWithId(getCommitElems(), commitId);
+		if (elem === null && commitId !== null && this.shouldVirtualizeCommitTable()) {
+			this.viewElem.scroll(0, this.controlsElem.clientHeight + 31 + commitId * COMMIT_ROW_HEIGHT + 12 - this.viewElem.clientHeight / 2);
+			this.renderTable();
+			elem = findCommitElemWithId(getCommitElems(), commitId);
+		}
 		if (elem === null) return;
 
 		let elemTop = this.controlsElem.clientHeight + elem.offsetTop;
@@ -2764,6 +2833,7 @@ class GitGraphView {
 			if (active !== scrollTop > 0) {
 				active = scrollTop > 0;
 			}
+			this.scheduleVirtualTableRender();
 
 			if (this.config.loadMoreCommitsAutomatically && this.moreCommitsAvailable && !this.currentRepoRefreshState.inProgress) {
 				const viewHeight = this.viewElem.clientHeight, contentHeight = this.viewElem.scrollHeight;
