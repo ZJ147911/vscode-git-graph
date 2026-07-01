@@ -117,6 +117,32 @@ const PATH_FILTER_WS_ALL = 'workspace_all';
 
 const COLUMN_HIDDEN = -100;
 const COLUMN_AUTO = -101;
+const PERF_MEASURE_STORAGE_KEY = 'gitGraph.performanceMeasurements';
+
+function arePerfMeasurementsEnabled() {
+	try {
+		return window.localStorage.getItem(PERF_MEASURE_STORAGE_KEY) === 'true';
+	} catch (_) {
+		return false;
+	}
+}
+
+function startPerfMeasure(name: string, detail?: () => string) {
+	if (!arePerfMeasurementsEnabled() || typeof performance === 'undefined') {
+		return () => { };
+	}
+
+	const id = Date.now().toString(36) + Math.random().toString(36).substring(2);
+	const startMark = 'git-graph:' + name + ':start:' + id;
+	const endMark = 'git-graph:' + name + ':end:' + id;
+	performance.mark(startMark);
+	return () => {
+		performance.mark(endMark);
+		performance.measure('git-graph:' + name + (detail ? ' [' + detail() + ']' : ''), startMark, endMark);
+		performance.clearMarks(startMark);
+		performance.clearMarks(endMark);
+	};
+}
 
 const COLUMN_MIN_WIDTH = 40;
 const COLUMN_LEFT_RIGHT_PADDING = 24;

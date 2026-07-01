@@ -876,43 +876,48 @@ class GitGraphView {
 	/* State */
 
 	public saveState() {
-		let expandedCommit;
-		if (this.expandedCommit !== null) {
-			expandedCommit = Object.assign({}, this.expandedCommit);
-			expandedCommit.commitElem = null;
-			expandedCommit.compareWithElem = null;
-			expandedCommit.contextMenuOpen = {
-				summary: false,
-				fileView: -1
-			};
-		} else {
-			expandedCommit = null;
-		}
+		const endPerfMeasure = startPerfMeasure('saveState', () => this.commits.length + ' commits');
+		try {
+			let expandedCommit;
+			if (this.expandedCommit !== null) {
+				expandedCommit = Object.assign({}, this.expandedCommit);
+				expandedCommit.commitElem = null;
+				expandedCommit.compareWithElem = null;
+				expandedCommit.contextMenuOpen = {
+					summary: false,
+					fileView: -1
+				};
+			} else {
+				expandedCommit = null;
+			}
 
-		VSCODE_API.setState({
-			currentRepo: this.currentRepo,
-			currentRepoLoading: this.currentRepoLoading,
-			gitRepos: this.gitRepos,
-			gitBranches: this.gitBranches,
-			gitBranchHead: this.gitBranchHead,
-			gitConfig: this.gitConfig,
-			gitRemotes: this.gitRemotes,
-			gitStashes: this.gitStashes,
-			gitTags: this.gitTags,
-			commits: this.commits,
-			commitHead: this.commitHead,
-			avatars: this.avatars,
-			currentBranches: this.currentBranches,
-			currentAuthors: this.currentAuthors,
-			moreCommitsAvailable: this.moreCommitsAvailable,
-			maxCommits: this.maxCommits,
-			onlyFollowFirstParent: this.onlyFollowFirstParent,
-			expandedCommit: expandedCommit,
-			scrollTop: this.scrollTop,
-			selectedCommits: Array.from(this.selectedCommits),
-			findWidget: this.findWidget.getState(),
-			settingsWidget: this.settingsWidget.getState()
-		});
+			VSCODE_API.setState({
+				currentRepo: this.currentRepo,
+				currentRepoLoading: this.currentRepoLoading,
+				gitRepos: this.gitRepos,
+				gitBranches: this.gitBranches,
+				gitBranchHead: this.gitBranchHead,
+				gitConfig: this.gitConfig,
+				gitRemotes: this.gitRemotes,
+				gitStashes: this.gitStashes,
+				gitTags: this.gitTags,
+				commits: this.commits,
+				commitHead: this.commitHead,
+				avatars: this.avatars,
+				currentBranches: this.currentBranches,
+				currentAuthors: this.currentAuthors,
+				moreCommitsAvailable: this.moreCommitsAvailable,
+				maxCommits: this.maxCommits,
+				onlyFollowFirstParent: this.onlyFollowFirstParent,
+				expandedCommit: expandedCommit,
+				scrollTop: this.scrollTop,
+				selectedCommits: Array.from(this.selectedCommits),
+				findWidget: this.findWidget.getState(),
+				settingsWidget: this.settingsWidget.getState()
+			});
+		} finally {
+			endPerfMeasure();
+		}
 	}
 
 	public saveRepoState() {
@@ -1187,11 +1192,25 @@ class GitGraphView {
 	/* Renderers */
 
 	private render() {
-		this.renderTable();
-		this.renderGraph();
+		const endPerfMeasure = startPerfMeasure('render', () => this.commits.length + ' commits');
+		try {
+			this.renderTable();
+			this.renderGraph();
+		} finally {
+			endPerfMeasure();
+		}
 	}
 
 	private renderGraph() {
+		const endPerfMeasure = startPerfMeasure('renderGraph', () => this.commits.length + ' commits');
+		try {
+			this.renderGraphCore();
+		} finally {
+			endPerfMeasure();
+		}
+	}
+
+	private renderGraphCore() {
 		if (typeof this.currentRepo === 'undefined') {
 			// Only render the graph if a repo is loaded (or a repo is currently being loaded)
 			return;
@@ -1216,6 +1235,15 @@ class GitGraphView {
 	}
 
 	private renderTable() {
+		const endPerfMeasure = startPerfMeasure('renderTable', () => this.commits.length + ' commits');
+		try {
+			this.renderTableCore();
+		} finally {
+			endPerfMeasure();
+		}
+	}
+
+	private renderTableCore() {
 		const colVisibility = this.getColumnVisibility();
 		const currentHash = this.commits.length > 0 && this.commits[0].hash === UNCOMMITTED ? UNCOMMITTED : this.commitHead;
 		const vertexColours = this.graph.getVertexColours();
