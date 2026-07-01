@@ -47,6 +47,7 @@ class GitGraphView {
 	private renderedGitBranchHead: string | null = null;
 	private renderedCommitRange: CommitRenderRange = { start: 0, end: 0, virtualized: false };
 	private virtualTableAnimationFrame: number | null = null;
+	private graphRenderAnimationFrame: number | null = null;
 
 	private lastScrollToStash: {
 		time: number,
@@ -1210,13 +1211,17 @@ class GitGraphView {
 		const endPerfMeasure = startPerfMeasure('render', () => this.commits.length + ' commits');
 		try {
 			this.renderTable();
-			this.renderGraph();
+			this.scheduleGraphRender();
 		} finally {
 			endPerfMeasure();
 		}
 	}
 
 	private renderGraph() {
+		if (this.graphRenderAnimationFrame !== null) {
+			window.cancelAnimationFrame(this.graphRenderAnimationFrame);
+			this.graphRenderAnimationFrame = null;
+		}
 		const endPerfMeasure = startPerfMeasure('renderGraph', () => this.commits.length + ' commits');
 		try {
 			this.renderGraphCore();
@@ -1247,6 +1252,15 @@ class GitGraphView {
 		this.config.graph.grid.offsetY = headerHeight + this.config.graph.grid.y / 2;
 
 		this.graph.render(expandedCommit);
+	}
+
+	private scheduleGraphRender() {
+		if (this.graphRenderAnimationFrame !== null) return;
+
+		this.graphRenderAnimationFrame = window.requestAnimationFrame(() => {
+			this.graphRenderAnimationFrame = null;
+			this.renderGraph();
+		});
 	}
 
 	private renderTable() {
