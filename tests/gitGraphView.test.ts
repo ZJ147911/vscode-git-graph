@@ -3137,7 +3137,34 @@ describe('GitGraphView', () => {
 
 				// Assert
 				await waitForExpect(() => {
-					expect(spyOnResetFileToRevision).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', 'path/to/file');
+					expect(spyOnResetFileToRevision).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', 'path/to/file', null);
+					expect(messages).toStrictEqual([
+						{
+							command: 'resetFileToRevision',
+							error: resetFileToRevisionResolvedValue
+						}
+					]);
+				});
+			});
+
+			it('Should reset the file to a revision and delete another file', async () => {
+				// Setup
+				const resetFileToRevisionResolvedValue = null;
+				const spyOnResetFileToRevision = jest.spyOn(dataSource, 'resetFileToRevision');
+				spyOnResetFileToRevision.mockResolvedValueOnce(resetFileToRevisionResolvedValue);
+
+				// Run
+				onDidReceiveMessage({
+					command: 'resetFileToRevision',
+					repo: '/path/to/repo',
+					commitHash: '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b^',
+					filePath: 'path/to/old-file',
+					deleteFilePath: 'path/to/new-file'
+				});
+
+				// Assert
+				await waitForExpect(() => {
+					expect(spyOnResetFileToRevision).toHaveBeenCalledWith('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b^', 'path/to/old-file', 'path/to/new-file');
 					expect(messages).toStrictEqual([
 						{
 							command: 'resetFileToRevision',

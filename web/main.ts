@@ -3897,6 +3897,65 @@ class GitGraphView {
 			}
 		};
 
+		const formatCommitRef = (commitHash: string | null) => {
+			return commitHash === null
+				? ''
+				: commitHash.endsWith('^')
+					? abbrevCommit(commitHash.substring(0, commitHash.length - 1)) + '^'
+					: abbrevCommit(commitHash);
+		};
+
+		const getResetFileToRevisionOptions = (file: GG.GitFileChange, expandedCommit: ExpandedCommit) => {
+			const commit = this.commits[this.commitLookup[expandedCommit.commitHash]];
+			const beforeCommitHash = commit.stash !== null
+				? commit.stash.baseHash
+				: commit.parents.length > 0
+					? expandedCommit.commitHash + '^'
+					: null;
+			const afterCommitHash = commit.stash !== null && file.type === GG.GitFileStatus.Untracked
+				? commit.stash.untrackedFilesHash!
+				: expandedCommit.commitHash;
+			const options: {
+				name: string;
+				value: string;
+				commitHash: string | null;
+				filePath: string;
+				deleteFilePath: string | null;
+			}[] = [];
+
+			const addOption = (name: string, commitHash: string | null, filePath: string, deleteFilePath: string | null = null) => {
+				options.push({ name: name, value: options.length.toString(), commitHash: commitHash, filePath: filePath, deleteFilePath: deleteFilePath });
+			};
+
+			switch (file.type) {
+				case GG.GitFileStatus.Added:
+				case GG.GitFileStatus.Untracked:
+					addOption(getText('ui.resetFileToRevisionOptionBeforeDelete', file.newFilePath), null, file.newFilePath, file.newFilePath);
+					addOption(getText('ui.resetFileToRevisionOptionAfter', formatCommitRef(afterCommitHash), file.newFilePath), afterCommitHash, file.newFilePath);
+					break;
+				case GG.GitFileStatus.Deleted:
+					if (beforeCommitHash !== null) {
+						addOption(getText('ui.resetFileToRevisionOptionBefore', formatCommitRef(beforeCommitHash), file.oldFilePath), beforeCommitHash, file.oldFilePath);
+					}
+					addOption(getText('ui.resetFileToRevisionOptionAfterDelete', file.newFilePath), null, file.newFilePath, file.newFilePath);
+					break;
+				case GG.GitFileStatus.Renamed:
+					if (beforeCommitHash !== null) {
+						addOption(getText('ui.resetFileToRevisionOptionBefore', formatCommitRef(beforeCommitHash), file.oldFilePath), beforeCommitHash, file.oldFilePath, file.newFilePath);
+					}
+					addOption(getText('ui.resetFileToRevisionOptionAfter', formatCommitRef(afterCommitHash), file.newFilePath), afterCommitHash, file.newFilePath, file.oldFilePath);
+					break;
+				default:
+					if (beforeCommitHash !== null) {
+						addOption(getText('ui.resetFileToRevisionOptionBefore', formatCommitRef(beforeCommitHash), file.newFilePath), beforeCommitHash, file.newFilePath);
+					}
+					addOption(getText('ui.resetFileToRevisionOptionAfter', formatCommitRef(afterCommitHash), file.newFilePath), afterCommitHash, file.newFilePath);
+					break;
+			}
+
+			return options;
+		};
+
 		const triggerViewFileDiff = (file: GG.GitFileChange, fileElem: HTMLElement) => {
 			const expandedCommit = this.expandedCommit;
 			if (expandedCommit === null) return;
@@ -3943,12 +4002,13 @@ class GitGraphView {
 			const expandedCommit = this.expandedCommit;
 			if (expandedCommit === null) return;
 
-			const commitHash = getCommitHashForFile(file, expandedCommit);
-			dialog.showConfirmation(getText('ui.confirmResetFileToState', escapeHtml(file.newFilePath), abbrevCommit(commitHash)), getText('ui.yesResetFile'), () => {
-				runAction({ command: 'resetFileToRevision', repo: this.currentRepo, commitHash: commitHash, filePath: file.newFilePath }, getText('ui.actionResettingFile'));
+			const options = getResetFileToRevisionOptions(file, expandedCommit);
+			dialog.showSelect(getText('ui.selectResetFileToRevisionTarget', escapeHtml(file.newFilePath)), options.length > 1 ? '1' : '0', options, getText('ui.yesResetFile'), (value) => {
+				const option = options[parseInt(value)];
+				runAction({ command: 'resetFileToRevision', repo: this.currentRepo, commitHash: option.commitHash, filePath: option.filePath, deleteFilePath: option.deleteFilePath }, getText('ui.actionResettingFile'));
 			}, {
 				type: TargetType.CommitDetailsView,
-				hash: commitHash,
+				hash: expandedCommit.commitHash,
 				elem: fileElem
 			});
 		};
@@ -4050,6 +4110,7 @@ class GitGraphView {
 				elem: fileElem
 			};
 			const diffPossible = file.type === GG.GitFileStatus.Untracked || (file.additions !== null && file.deletions !== null);
+			const canResetFileToRevision = !isUncommitted && expandedCommit.compareWithHash === null;
 			const fileExistsAtThisRevision = file.type !== GG.GitFileStatus.Deleted && !isUncommitted;
 			const fileExistsAtThisRevisionAndDiffPossible = fileExistsAtThisRevision && diffPossible;
 			const codeReviewInProgressAndNotReviewed = expandedCommit.codeReview !== null && expandedCommit.codeReview.remainingFiles.includes(file.newFilePath);
@@ -4093,7 +4154,7 @@ class GitGraphView {
 				[
 					{
 						title: getText('ui.ctxResetFileToThisRevision') + ELLIPSIS,
-						visible: visibility.resetFileToThisRevision && fileExistsAtThisRevision && expandedCommit.compareWithHash === null,
+						visible: visibility.resetFileToThisRevision && canResetFileToRevision,
 						onClick: () => triggerResetFileToRevision(file, fileElem)
 					}
 				],

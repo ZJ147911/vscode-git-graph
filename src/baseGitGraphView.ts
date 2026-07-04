@@ -561,7 +561,7 @@ export abstract class BaseGitGraphView extends Disposable {
 			case 'resetFileToRevision':
 				this.sendMessage({
 					command: 'resetFileToRevision',
-					error: await this.dataSource.resetFileToRevision(msg.repo, msg.commitHash, msg.filePath)
+					error: await this.dataSource.resetFileToRevision(msg.repo, msg.commitHash, msg.filePath, msg.deleteFilePath ?? null)
 				});
 				break;
 			case 'resetToCommit':

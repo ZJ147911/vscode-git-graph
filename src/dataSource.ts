@@ -1644,10 +1644,17 @@ export class DataSource extends Disposable {
 	 * @param repo The path of the repository.
 	 * @param commitHash The commit to reset the file to.
 	 * @param filePath The file to reset.
+	 * @param deleteFilePath An optional file to delete after resetting.
 	 * @returns The ErrorInfo from the executed command.
 	 */
-	public resetFileToRevision(repo: string, commitHash: string, filePath: string) {
-		return this.runGitCommand(['checkout', commitHash, '--', filePath], repo);
+	public async resetFileToRevision(repo: string, commitHash: string | null, filePath: string, deleteFilePath: string | null = null) {
+		if (commitHash !== null) {
+			const checkoutError = await this.runGitCommand(['checkout', commitHash, '--', filePath], repo);
+			if (checkoutError !== null) return checkoutError;
+		}
+		return deleteFilePath !== null
+			? this.runGitCommand(['rm', '-f', '--ignore-unmatch', '--', deleteFilePath], repo)
+			: null;
 	}
 
 	/* Git Action Methods - Stash */

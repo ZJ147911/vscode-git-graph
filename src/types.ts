@@ -1219,8 +1219,9 @@ export interface RequestRescanForRepos extends BaseMessage {
 
 export interface RequestResetFileToRevision extends RepoRequest {
 	readonly command: 'resetFileToRevision';
-	readonly commitHash: string;
+	readonly commitHash: string | null;
 	readonly filePath: string;
+	readonly deleteFilePath?: string | null;
 }
 export interface ResponseResetFileToRevision extends ResponseWithErrorInfo {
 	readonly command: 'resetFileToRevision';

@@ -6490,6 +6490,33 @@ describe('DataSource', () => {
 			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['checkout', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b', '--', 'path/to/file'], expect.objectContaining({ cwd: '/path/to/repo' }));
 		});
 
+		it('Should reset file to revision and delete another file', async () => {
+			// Setup
+			mockGitSuccessOnce();
+			mockGitSuccessOnce();
+			const numSpawnCallsBefore = spyOnSpawn.mock.calls.length;
+
+			// Run
+			const result = await dataSource.resetFileToRevision('/path/to/repo', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b^', 'path/to/old-file', 'path/to/new-file');
+
+			// Assert
+			expect(result).toBe(null);
+			expect(spyOnSpawn.mock.calls[numSpawnCallsBefore]).toEqual(['/path/to/git', ['checkout', '1a2b3c4d5e6f1a2b3c4d5e6f1a2b3c4d5e6f1a2b^', '--', 'path/to/old-file'], expect.objectContaining({ cwd: '/path/to/repo' })]);
+			expect(spyOnSpawn.mock.calls[numSpawnCallsBefore + 1]).toEqual(['/path/to/git', ['rm', '-f', '--ignore-unmatch', '--', 'path/to/new-file'], expect.objectContaining({ cwd: '/path/to/repo' })]);
+		});
+
+		it('Should delete a file when resetting to a state where it does not exist', async () => {
+			// Setup
+			mockGitSuccessOnce();
+
+			// Run
+			const result = await dataSource.resetFileToRevision('/path/to/repo', null, 'path/to/file', 'path/to/file');
+
+			// Assert
+			expect(result).toBe(null);
+			expect(spyOnSpawn).toBeCalledWith('/path/to/git', ['rm', '-f', '--ignore-unmatch', '--', 'path/to/file'], expect.objectContaining({ cwd: '/path/to/repo' }));
+		});
+
 		it('Should return an error message thrown by git', async () => {
 			// Setup
 			mockGitThrowingErrorOnce();
