@@ -1821,9 +1821,9 @@ class GitGraphView {
 				visible: visibility.reset,
 				onClick: () => {
 					dialog.showSelect(getText('ui.confirmResetBranchToCommit', this.gitBranchHead !== null ? '<b><i>' + escapeHtml(this.gitBranchHead) + '</i></b> (' + getText('ui.currentBranch') + ')' : getText('ui.currentBranch'), abbrevCommit(hash)), this.config.dialogDefaults.resetCommit.mode, [
-						{ name: 'Soft - Keep all changes, but reset head', value: GG.GitResetMode.Soft },
-						{ name: 'Mixed - Keep working tree, but reset index', value: GG.GitResetMode.Mixed },
-						{ name: getText('ui.hardResetDiscardAllChanges'), value: GG.GitResetMode.Hard }
+						{ name: getText('ui.resetModeSoft'), value: GG.GitResetMode.Soft },
+						{ name: getText('ui.resetModeMixed'), value: GG.GitResetMode.Mixed },
+						{ name: getText('ui.resetModeHard'), value: GG.GitResetMode.Hard }
 					], getText('ui.yesReset'), (mode) => {
 						runAction({ command: 'resetToCommit', repo: this.currentRepo, commit: hash, resetMode: <GG.GitResetMode>mode }, getText('ui.actionResettingToCommit'));
 					}, target);
